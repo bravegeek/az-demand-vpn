@@ -94,6 +94,30 @@ graph TB
   - Username/password as fallback
   - Optional multi-factor authentication
 
+## Security and Access Control
+
+### Authentication and Identity Management
+- **Managed Identities**: All Azure services use system-assigned managed identities for secure, credential-less authentication between services
+- **Azure AD Integration**: Centralized identity management through Microsoft Entra ID (Azure AD)
+- **Multi-factor Authentication (MFA)**: Required for all administrative access
+
+### Role-Based Access Control (RBAC)
+- **Least Privilege Principle**: Minimum necessary permissions assigned to all identities
+- **Custom Roles**: Define specific roles tailored to operational needs:
+  - `VPN Operator`: Can start/stop VPN instances
+  - `VPN Administrator`: Full VPN infrastructure management
+  - `Auditor`: Read-only access to logs and metrics
+
+### Resource Access Policies
+- **Key Vault Access Policies**: Granular permissions for secrets, keys, and certificates
+- **Network Restrictions**: Limit management access to approved IP ranges
+- **Just-in-Time (JIT) Access**: For privileged operations when needed
+
+### Service Principals and Managed Identities
+- **System-assigned identities** for all Azure resources where possible
+- **Service principals with certificates** for external automation
+- **Automatic credential rotation** for all service principals
+
 ### Network Security
 - **Network Security Groups (NSGs)**:
   - Restrict inbound traffic to VPN ports only
