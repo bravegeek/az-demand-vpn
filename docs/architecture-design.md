@@ -227,6 +227,6 @@ graph TB
 - Health check implementation
 
 ### C. Infrastructure as Code Templates
-- ARM templates for resource deployment
+- Bicep files for resource deployment
 - Terraform configuration (alternative)
 - GitHub Actions workflow examples

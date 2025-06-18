@@ -3,7 +3,7 @@
 - **Always read `PLANNING.md`** at the start of a new
 conversation to understand the project's architecture, goals,
 style, and constraints.
-- **For technical architecture and system design**, refer to [technical_design_document.md](./technical_design_document.md).
+- **For technical architecture and system design**, refer to [architecture_design.md](./architecture_design.md).
 - **Check `TASK.md`** before starting a new task. If the task
 isn’t listed, add it with a brief description and today's date.
 - **Use consistent naming conventions, file structure, and
