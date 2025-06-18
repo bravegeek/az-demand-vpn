@@ -10,7 +10,7 @@ This document serves as the central hub for the Azure Demand VPN project, provid
 - [WireGuard Implementation](./docs/wireguard-implementation.md) - Specific implementation details for WireGuard VPN
 
 ### Development Guidelines
-- [Global Development Rules](./docs/global_development_rules.md) - Project-wide development standards and practices
+- [Global Development Guide](./docs/global-development-guide.md) - Project-wide development standards and practices
 - [JavaScript Implementation Guide](./docs/javascript-implementation-guide.md) - Standards for Azure Functions implementation in JavaScript
 
 ## Project Management
@@ -59,7 +59,7 @@ az-demand-vpn/
 ## Getting Started
 1. Review the [Architecture Design](./docs/architecture-design.md) document
 2. Set up your development environment according to the [JavaScript Implementation Guide](./docs/javascript-implementation-guide.md)
-3. Follow the [Global Development Rules](./docs/global_development_rules.md)
+3. Follow the [Global Development Guide](./docs/global-development-guide.md)
 
 ## Team Coordination
 - Weekly status updates on Mondays

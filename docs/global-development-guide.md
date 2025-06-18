@@ -3,7 +3,7 @@
 - **Always read `PLANNING.md`** at the start of a new
 conversation to understand the project's architecture, goals,
 style, and constraints.
-- **For technical architecture and system design**, refer to [architecture_design.md](./architecture_design.md).
+- **For technical architecture and system design**, refer to [architecture-design.md](./architecture-design.md).
 - **Check `TASK.md`** before starting a new task. If the task
 isn’t listed, add it with a brief description and today's date.
 - **Use consistent naming conventions, file structure, and
@@ -58,15 +58,6 @@ finishing them.
 - Use arrow functions for callbacks
 - Use template literals for string interpolation
 - Use destructuring when appropriate
-
-#### Game-Specific Conventions
-- Use classes for game entities (Meteor, Player, etc.)
-- Follow the Entity-Component-System (ECS) pattern as defined in the technical design
-- Keep game loop logic clean and efficient
-
-#### File Structure
-```
-TODO
 
 #### Documentation
 - Use JSDoc for all functions and classes
