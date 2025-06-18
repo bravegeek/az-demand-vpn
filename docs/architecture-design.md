@@ -64,41 +64,24 @@ This document details the architectural design for implementing an on-demand VPN
 
 ## Network Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                           Azure Cloud                               │
-│                                                                     │
-│  ┌─────────────┐      ┌─────────────┐      ┌─────────────────────┐  │
-│  │             │      │             │      │                     │  │
-│  │  Azure      │      │  Azure      │      │  Azure Container    │  │
-│  │  Functions  │─────▶│  Container  │─────▶│  Instance           │  │
-│  │             │      │  Registry   │      │  (VPN Container)    │  │
-│  └─────────────┘      └─────────────┘      └─────────────────────┘  │
-│         │                                           │               │
-│         │                                           │               │
-│         ▼                                           ▼               │
-│  ┌─────────────┐                           ┌─────────────────────┐  │
-│  │             │                           │                     │  │
-│  │  Azure      │                           │  Public IP          │  │
-│  │  Storage    │                           │  Address            │  │
-│  │             │                           │                     │  │
-│  └─────────────┘                           └─────────────────────┘  │
-│                                                     │               │
-└─────────────────────────────────────────────────────┼───────────────┘
-                                                      │
-                                                      │
-┌────────────────────────────────────────────────────┼───────────────┐
-│                                                    │               │
-│                                                    ▼               │
-│  ┌─────────────┐                           ┌─────────────────────┐  │
-│  │             │                           │                     │  │
-│  │  Client     │◀────────────────────────▶│  Internet           │  │
-│  │  Device     │                           │                     │  │
-│  │             │                           │                     │  │
-│  └─────────────┘                           └─────────────────────┘  │
-│                                                                     │
-│                         Client Environment                          │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph "Azure Cloud"
+        AF[Azure Functions] --> ACR[Azure Container Registry]
+        ACR --> ACI["Azure Container Instance (VPN Container)"]
+        AF --> AS[Azure Storage]
+        AF --> AKV[Azure Key Vault]
+        ACI --> Internet[Internet]
+        Internet --> VPNClients[VPN Clients]
+    end
+    
+    classDef azure fill:#0072C6,stroke:#0072C6,color:white
+    classDef internet fill:#7FBA00,stroke:#7FBA00,color:white
+    classDef clients fill:#F25022,stroke:#F25022,color:white
+    
+    class AF,ACR,ACI,AS,AKV azure
+    class Internet internet
+    class VPNClients clients
 ```
 
 ## Security Architecture
