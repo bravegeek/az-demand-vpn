@@ -1,0 +1,63 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "projectName": {
+      "value": "demandvpn"
+    },
+    "environment": {
+      "value": "prod"
+    },
+    "location": {
+      "value": "East US 2"
+    },
+    "vpnConfig": {
+      "value": {
+        "wireguardPort": 51820,
+        "openvpnPort": 1194,
+        "maxConnections": 200,
+        "idleTimeoutMinutes": 60
+      }
+    },
+    "acrConfig": {
+      "value": {
+        "sku": "Premium",
+        "adminUserEnabled": false,
+        "geoReplication": true
+      }
+    },
+    "storageConfig": {
+      "value": {
+        "sku": "Standard_GRS",
+        "accessTier": "Hot",
+        "allowBlobPublicAccess": false,
+        "allowSharedKeyAccess": false
+      }
+    },
+    "keyVaultConfig": {
+      "value": {
+        "sku": "premium",
+        "enableSoftDelete": true,
+        "softDeleteRetentionInDays": 90,
+        "enablePurgeProtection": true,
+        "enableRbacAuthorization": true
+      }
+    },
+    "functionConfig": {
+      "value": {
+        "runtime": "dotnet",
+        "version": "6",
+        "planSku": "P2V3",
+        "alwaysOn": true
+      }
+    },
+    "networkConfig": {
+      "value": {
+        "vnetAddressPrefix": "10.0.0.0/16",
+        "vpnSubnetPrefix": "10.0.1.0/24",
+        "functionsSubnetPrefix": "10.0.2.0/24",
+        "endpointsSubnetPrefix": "10.0.3.0/24"
+      }
+    }
+  }
+}
