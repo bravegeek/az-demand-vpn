@@ -73,12 +73,12 @@ function Test-AzureLogin {
     try {
         $context = az account show 2>$null | ConvertFrom-Json
         if ($context) {
-            Write-ColorOutput "✓ Azure CLI logged in as: $($context.user.name)" "Green"
+            Write-ColorOutput " Azure CLI logged in as: $($context.user.name)" "Green"
             return $true
         }
     }
     catch {
-        Write-ColorOutput "✗ Azure CLI not logged in or no subscription selected" "Red"
+        Write-ColorOutput " Azure CLI not logged in or no subscription selected" "Red"
         return $false
     }
     return $false
@@ -87,17 +87,17 @@ function Test-AzureLogin {
 # Function to check Docker
 function Test-Docker {
     if (-not (Test-Command "docker")) {
-        Write-ColorOutput "✗ Docker is not installed or not in PATH" "Red"
+        Write-ColorOutput " Docker is not installed or not in PATH" "Red"
         return $false
     }
     
     try {
         docker version | Out-Null
-        Write-ColorOutput "✓ Docker is running" "Green"
+        Write-ColorOutput " Docker is running" "Green"
         return $true
     }
     catch {
-        Write-ColorOutput "✗ Docker is not running" "Red"
+        Write-ColorOutput " Docker is not running" "Red"
         return $false
     }
 }
@@ -111,31 +111,31 @@ function Get-ACRLoginServer {
         }
     }
     catch {
-        Write-ColorOutput "✗ Failed to get ACR login server for $RegistryName" "Red"
+        Write-ColorOutput " Failed to get ACR login server for $RegistryName" "Red"
         return $null
     }
     return $null
 }
 
 # Function to login to ACR
-function Login-ACR {
+function Connect-ACR {
     try {
         Write-ColorOutput "Logging in to Azure Container Registry..." "Yellow"
         az acr login --name $RegistryName
         if ($LASTEXITCODE -eq 0) {
-            Write-ColorOutput "✓ Successfully logged in to ACR" "Green"
+            Write-ColorOutput " Successfully logged in to ACR" "Green"
             return $true
         }
     }
     catch {
-        Write-ColorOutput "✗ Failed to login to ACR" "Red"
+        Write-ColorOutput " Failed to login to ACR" "Red"
         return $false
     }
     return $false
 }
 
 # Function to build Docker image
-function Build-DockerImage {
+function New-DockerImage {
     $imageName = "$RegistryName.azurecr.io/wireguard-vpn:$ImageTag"
     
     Write-ColorOutput "Building Docker image: $imageName" "Yellow"
@@ -144,16 +144,16 @@ function Build-DockerImage {
     try {
         docker build --tag $imageName --file Dockerfile .
         if ($LASTEXITCODE -eq 0) {
-            Write-ColorOutput "✓ Docker image built successfully" "Green"
+            Write-ColorOutput " Docker image built successfully" "Green"
             return $imageName
         }
         else {
-            Write-ColorOutput "✗ Docker build failed" "Red"
+            Write-ColorOutput " Docker build failed" "Red"
             return $null
         }
     }
     catch {
-        Write-ColorOutput "✗ Docker build failed with error: $_" "Red"
+        Write-ColorOutput " Docker build failed with error: $_" "Red"
         return $null
     }
 }
@@ -167,16 +167,16 @@ function Push-DockerImage {
     try {
         docker push $ImageName
         if ($LASTEXITCODE -eq 0) {
-            Write-ColorOutput "✓ Docker image pushed successfully" "Green"
+            Write-ColorOutput " Docker image pushed successfully" "Green"
             return $true
         }
         else {
-            Write-ColorOutput "✗ Docker push failed" "Red"
+            Write-ColorOutput " Docker push failed" "Red"
             return $false
         }
     }
     catch {
-        Write-ColorOutput "✗ Docker push failed with error: $_" "Red"
+        Write-ColorOutput " Docker push failed with error: $_" "Red"
         return $false
     }
 }
@@ -193,7 +193,7 @@ function Show-ImageInfo {
     
     # Show image size
     try {
-        $size = docker images --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}" | Select-String "wireguard-vpn:$ImageTag"
+        $size = docker images --format "table {{.Repository}}:{{.Tag}}`t{{.Size}}" | Select-String "wireguard-vpn:$ImageTag"
         if ($size) {
             Write-ColorOutput "  Size: $($size.ToString().Split("`t")[1])" "White"
         }
@@ -229,19 +229,19 @@ function Main {
             exit 1
         }
         
-        if (-not (Login-ACR)) {
+        if (-not (Connect-ACR)) {
             Write-ColorOutput "Failed to login to ACR. Please check your permissions." "Red"
             exit 1
         }
     }
     
-    Write-ColorOutput "✓ Pre-flight checks passed" "Green"
+    Write-ColorOutput " Pre-flight checks passed" "Green"
     Write-ColorOutput ""
     
     # Build image
     $imageName = $null
     if (-not $SkipBuild) {
-        $imageName = Build-DockerImage
+        $imageName = New-DockerImage
         if (-not $imageName) {
             Write-ColorOutput "Build failed. Exiting." "Red"
             exit 1
@@ -266,12 +266,12 @@ function Main {
     Write-ColorOutput ""
     Write-ColorOutput "=== Build Summary ===" "Cyan"
     if (-not $SkipBuild) {
-        Write-ColorOutput "✓ Docker image built successfully" "Green"
+        Write-ColorOutput " Docker image built successfully" "Green"
     }
     if ($PushToRegistry) {
-        Write-ColorOutput "✓ Docker image pushed to ACR" "Green"
+        Write-ColorOutput " Docker image pushed to ACR" "Green"
     }
-    Write-ColorOutput "✓ Build completed successfully" "Green"
+    Write-ColorOutput " Build completed successfully" "Green"
     Write-ColorOutput ""
     Write-ColorOutput "Next steps:" "Yellow"
     Write-ColorOutput "  1. Test the container locally: docker run --rm -it $imageName" "White"
@@ -284,6 +284,6 @@ try {
     Main
 }
 catch {
-    Write-ColorOutput "`n✗ Build script failed with error: $_" "Red"
+    Write-ColorOutput "`n Build script failed with error: $_" "Red"
     exit 1
 }
