@@ -71,7 +71,7 @@ Represents VPN client setup information.
 | qrCodeData | string | No | Base64 PNG | QR code for mobile setup |
 | createdAt | timestamp | Yes | ISO 8601 | Configuration creation time |
 | expiresAt | timestamp | Yes | ISO 8601 | Expiration time (session termination + grace period) |
-| downloadToken | string | No | SAS token | Temporary download token |
+| downloadToken | string | No | SAS token (1-hour expiry, read-only) | Temporary download token for secure config access |
 
 **Relationships**:
 - Belongs to: VPNSession

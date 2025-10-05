@@ -319,23 +319,7 @@ export TEST_USER_ID="test-user-001"
    done
    ```
 
-2. **Check infrastructure state**
-   ```bash
-   # Query infrastructure state (admin endpoint)
-   curl -X GET $VPN_API_ENDPOINT/admin/infrastructure/state \
-     -H "X-API-Key: $ADMIN_KEY"
-   ```
-
-   **Expected**:
-   ```json
-   {
-     "activeContainerInstances": 3,
-     "activeSessions": 3,
-     "quotaLimitReached": true
-   }
-   ```
-
-3. **Attempt 4th user provision (should fail or queue)**
+2. **Attempt 4th user provision (should fail or queue)**
    ```bash
    curl -X POST $VPN_API_ENDPOINT/vpn/start \
      -H "X-API-Key: user-4-key"
@@ -351,8 +335,7 @@ export TEST_USER_ID="test-user-001"
 
    **Validation**:
    - ✅ 3 users provisioned successfully
-   - ✅ 4th user rejected
-   - ✅ Infrastructure state shows limit reached
+   - ✅ 4th user rejected with 429 or 503 status
 
 **Scenario 5 Success Criteria**: 3-user limit enforced, additional requests handled gracefully
 
@@ -391,13 +374,17 @@ export TEST_USER_ID="test-user-001"
    - ✅ Config download URL is temporary (SAS token, 1-hour expiry)
 
 4. **Verify audit logging**
-   ```bash
-   # Query operational events (admin endpoint)
-   curl -X GET "$VPN_API_ENDPOINT/admin/events?type=auth.failure&limit=10" \
-     -H "X-API-Key: $ADMIN_KEY"
-   ```
 
-   **Expected**: Auth failure events logged with IP, timestamp
+   Auth failure events are automatically logged to Application Insights and Azure Table Storage (OperationalEvent table) with IP address, timestamp, and outcome='failure'. Use Azure Portal or Azure CLI to query logs:
+
+   ```bash
+   # Query using Azure CLI
+   az monitor app-insights events show \
+     --app $APPINSIGHTS_NAME \
+     --resource-group $RESOURCE_GROUP \
+     --type customEvents \
+     --filter "name == 'auth.failure'"
+   ```
 
 **Scenario 6 Success Criteria**: Authentication enforced, secrets protected, audit trail maintained
 
@@ -419,10 +406,10 @@ for session_id in $(jq -r '.sessions[].sessionId' sessions.json); do
     -d "{\"sessionId\": \"$session_id\"}"
 done
 
-# Verify infrastructure state cleared
-curl -X GET $VPN_API_ENDPOINT/admin/infrastructure/state \
-  -H "X-API-Key: $ADMIN_KEY"
-# Expected: activeContainerInstances=0, activeSessions=0
+# Verify all sessions terminated
+curl -X GET $VPN_API_ENDPOINT/vpn/status \
+  -H "X-API-Key: $TEST_API_KEY"
+# Expected: empty sessions array or all status='terminated'
 ```
 
 ## Success Metrics

@@ -111,8 +111,7 @@ As a remote worker or system administrator, I need to securely access private ne
 - **FR-029**: System MUST persist VPN configurations for active sessions
 - **FR-030**: System MUST clean up expired client configurations automatically
 - **FR-031**: System MUST retain operational logs for 5 days minimum
-- **FR-032**: System MUST backup critical configuration data for disaster recovery
-- **FR-033**: System MUST support configuration versioning to enable rollback
+- **FR-032**: System MUST backup critical configuration data for disaster recovery (satisfied by Azure Storage geo-redundant replication and Key Vault backup features)
 
 ### Key Entities *(include if feature involves data)*
 
@@ -120,7 +119,7 @@ As a remote worker or system administrator, I need to securely access private ne
 
 - **Client Configuration**: Represents VPN client setup information including configuration file content, authentication certificates, connection parameters, expiration timestamp, and delivery method (download/QR code)
 
-- **User/Tenant**: Represents an authorized entity that can request VPN access with attributes including authentication credentials, authorization level, quota limits, and usage history
+- **UserTenant**: Represents an authorized entity (user or tenant) that can request VPN access with attributes including authentication credentials, authorization level, quota limits, and usage history
 
 - **Operational Event**: Represents system events and audit trail including event type (provisioning/deprovisioning/authentication/error), timestamp, user identifier, outcome status, and associated metadata
 
