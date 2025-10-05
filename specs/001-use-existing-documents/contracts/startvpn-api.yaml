@@ -1,0 +1,182 @@
+openapi: 3.0.0
+info:
+  title: StartVPN API
+  description: Provision on-demand VPN container instance
+  version: 1.0.0
+
+paths:
+  /api/vpn/start:
+    post:
+      summary: Start VPN session
+      description: Provision a new VPN container instance for the authenticated user
+      operationId: startVPN
+      tags:
+        - VPN Provisioning
+
+      security:
+        - ApiKeyAuth: []
+
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                idleTimeoutMinutes:
+                  type: integer
+                  minimum: 1
+                  maximum: 1440
+                  default: 10
+                  description: Minutes of inactivity before auto-shutdown
+                allowedIPs:
+                  type: string
+                  default: "0.0.0.0/0"
+                  description: CIDR routes through VPN
+                dnsServers:
+                  type: array
+                  items:
+                    type: string
+                    format: ipv4
+                  description: Custom DNS servers
+
+      responses:
+        '200':
+          description: VPN provisioned successfully (within 2 minutes)
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - sessionId
+                  - status
+                  - endpoint
+                  - configDownloadUrl
+                properties:
+                  sessionId:
+                    type: string
+                    format: uuid
+                    description: Unique session identifier
+                  status:
+                    type: string
+                    enum: [provisioning, active]
+                    description: Current session status
+                  endpoint:
+                    type: object
+                    required:
+                      - ipAddress
+                      - port
+                    properties:
+                      ipAddress:
+                        type: string
+                        format: ipv4
+                      port:
+                        type: integer
+                        default: 51820
+                  configDownloadUrl:
+                    type: string
+                    format: uri
+                    description: Temporary URL to download client config (expires in 1 hour)
+                  qrCodeData:
+                    type: string
+                    format: byte
+                    description: Base64 encoded QR code PNG for mobile setup
+                  clientIpAddress:
+                    type: string
+                    description: Client IP within VPN subnet (e.g., 10.8.0.2)
+                  provisionedAt:
+                    type: string
+                    format: date-time
+                  expiresAt:
+                    type: string
+                    format: date-time
+                    description: When session auto-terminates if idle
+
+        '202':
+          description: Provisioning in progress (check status endpoint)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessionId:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [provisioning]
+                  estimatedCompletionTime:
+                    type: string
+                    format: date-time
+
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '401':
+          description: Unauthorized - invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '409':
+          description: Conflict - user already has active session (will be cancelled per FR-005a)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  existingSessionId:
+                    type: string
+                    format: uuid
+                  action:
+                    type: string
+                    enum: [cancelling_existing, starting_new]
+
+        '429':
+          description: Too many requests - quota limit reached
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '503':
+          description: Service unavailable - provisioning failed after 3 retries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  retryAfterSeconds:
+                    type: integer
+                  attempts:
+                    type: integer
+                    maximum: 3
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        details:
+          type: object

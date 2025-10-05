@@ -1,0 +1,133 @@
+openapi: 3.0.0
+info:
+  title: StopVPN API
+  description: Deprovision VPN container instance
+  version: 1.0.0
+
+paths:
+  /api/vpn/stop:
+    post:
+      summary: Stop VPN session
+      description: Deprovision VPN container instance and cleanup resources (completes within 1 minute)
+      operationId: stopVPN
+      tags:
+        - VPN Lifecycle
+
+      security:
+        - ApiKeyAuth: []
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - sessionId
+              properties:
+                sessionId:
+                  type: string
+                  format: uuid
+                  description: Session to terminate
+                force:
+                  type: boolean
+                  default: false
+                  description: Force termination even if active connections exist
+
+      responses:
+        '200':
+          description: VPN stopped successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - sessionId
+                  - status
+                  - terminatedAt
+                properties:
+                  sessionId:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [terminated]
+                  terminatedAt:
+                    type: string
+                    format: date-time
+                  durationMinutes:
+                    type: number
+                    description: Session duration in minutes
+                  bytesTransferred:
+                    type: integer
+                    description: Total bytes transferred during session
+
+        '202':
+          description: Termination in progress
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessionId:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [terminating]
+
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '409':
+          description: Session not in stoppable state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  currentStatus:
+                    type: string
+                  allowedStatuses:
+                    type: array
+                    items:
+                      type: string
+                    example: [active, idle]
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        code:
+          type: string

@@ -1,0 +1,183 @@
+openapi: 3.0.0
+info:
+  title: StatusVPN API
+  description: Query VPN session status and health
+  version: 1.0.0
+
+paths:
+  /api/vpn/status/{sessionId}:
+    get:
+      summary: Get VPN session status
+      description: Retrieve current status of VPN session (responds within 5 seconds per FR-024)
+      operationId: getVPNStatus
+      tags:
+        - VPN Monitoring
+
+      security:
+        - ApiKeyAuth: []
+
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Session identifier
+
+      responses:
+        '200':
+          description: Session status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - sessionId
+                  - userId
+                  - status
+                  - createdAt
+                properties:
+                  sessionId:
+                    type: string
+                    format: uuid
+                  userId:
+                    type: string
+                  status:
+                    type: string
+                    enum: [provisioning, active, idle, terminating, terminated]
+                  health:
+                    type: string
+                    enum: [healthy, degraded, unhealthy]
+                    description: Container health check status
+                  endpoint:
+                    type: object
+                    properties:
+                      ipAddress:
+                        type: string
+                        format: ipv4
+                      port:
+                        type: integer
+                  metrics:
+                    type: object
+                    properties:
+                      connectedClients:
+                        type: integer
+                        description: Number of active VPN connections
+                      bytesReceived:
+                        type: integer
+                      bytesSent:
+                        type: integer
+                      lastActivity:
+                        type: string
+                        format: date-time
+                      uptimeMinutes:
+                        type: number
+                  createdAt:
+                    type: string
+                    format: date-time
+                  lastActivityAt:
+                    type: string
+                    format: date-time
+                  idleTimeoutAt:
+                    type: string
+                    format: date-time
+                    description: When auto-shutdown triggers if no activity
+                  terminatedAt:
+                    type: string
+                    format: date-time
+                  errorMessage:
+                    type: string
+                    description: Error details if status is failed
+
+        '400':
+          description: Invalid session ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/vpn/status:
+    get:
+      summary: List all user sessions
+      description: Get all VPN sessions for authenticated user
+      operationId: listVPNSessions
+      tags:
+        - VPN Monitoring
+
+      security:
+        - ApiKeyAuth: []
+
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [provisioning, active, idle, terminating, terminated]
+          description: Filter by session status
+
+      responses:
+        '200':
+          description: Session list retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        sessionId:
+                          type: string
+                          format: uuid
+                        status:
+                          type: string
+                        createdAt:
+                          type: string
+                          format: date-time
+                  totalCount:
+                    type: integer
+                  activeCount:
+                    type: integer
+
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        code:
+          type: string
