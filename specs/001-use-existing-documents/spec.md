@@ -60,9 +60,9 @@ As a remote worker or system administrator, I need to securely access private ne
 ### Edge Cases
 - What happens when VPN provisioning fails due to cloud service quota limits? System retries with exponential backoff up to 3 attempts before failing
 - How does system handle concurrent requests from multiple users? System supports maximum of 3 concurrent users; additional requests are queued or rejected
-- What happens when network connectivity is lost during active VPN session?
-- How does system handle certificate expiration for VPN authentication?
-- What happens if automatic shutdown fails or is interrupted?
+- What happens when network connectivity is lost during active VPN session? Idle timeout monitor detects lack of activity and automatically terminates dead connections after configured timeout period
+- How does system handle certificate expiration for VPN authentication? WireGuard cryptographic keys do not expire; key rotation is manual operational procedure outside system scope
+- What happens if automatic shutdown fails or is interrupted? System retries ACI deprovision operation; persistent failures logged for manual intervention
 - When concurrent provisioning requests occur from same user, system cancels in-progress request and starts new one
 
 ## Requirements *(mandatory)*
@@ -74,21 +74,20 @@ As a remote worker or system administrator, I need to securely access private ne
 - **FR-002**: System MUST deprovision VPN infrastructure within 1 minute of shutdown request
 - **FR-003**: System MUST automatically shutdown idle VPN connections after configurable timeout period (default: 10 minutes) to minimize costs
 - **FR-004**: System MUST retry provisioning with exponential backoff (up to 3 attempts) when cloud resource quotas or limits are exceeded, then fail if unsuccessful
-- **FR-005**: System MUST support only one active VPN instance per user or tenant to control costs
-- **FR-005a**: When concurrent provisioning requests occur from the same user/tenant, system MUST cancel the in-progress request and start the new request
+- **FR-005**: System MUST enforce only one active VPN instance per user or tenant to control costs; when concurrent provisioning requests occur from the same user/tenant, system MUST cancel the in-progress request and start the new request
 
 **Client Configuration and Access**
 - **FR-006**: System MUST generate client configuration files automatically upon VPN provisioning
-- **FR-007**: System MUST support certificate-based authentication for VPN access
+- **FR-007**: System MUST support WireGuard cryptographic key-based authentication for VPN access (public/private key pairs)
 - **FR-008**: System MUST provide connection details (IP address, port, credentials) to authorized users
 - **FR-009**: Client configurations MUST be compatible with standard VPN client software
 - **FR-010**: System MUST support configuration delivery via secure download or QR code for mobile devices
 
 **Security and Authentication**
-- **FR-011**: System MUST authenticate users before allowing VPN provisioning requests
-- **FR-012**: System MUST use certificate-based VPN authentication as primary method
+- **FR-011**: System MUST authenticate users before allowing VPN provisioning requests (API key authentication primary, Azure AD integration future)
+- **FR-012**: System MUST use WireGuard cryptographic key-based VPN authentication as primary method (public/private key pairs, not X.509 certificates)
 - **FR-013**: System MUST encrypt all VPN traffic using industry-standard encryption protocols
-- **FR-014**: System MUST restrict VPN access to authorized IP ranges when configured
+- **FR-014**: System MUST restrict VPN provisioning requests to authorized source IP ranges when configured per user (stored in UserTenant.allowedSourceIPs optional field)
 - **FR-015**: System MUST store all secrets, keys, and certificates securely
 - **FR-016**: System MUST enforce least-privilege access to all infrastructure components
 
@@ -101,11 +100,11 @@ As a remote worker or system administrator, I need to securely access private ne
 - **FR-022**: System MUST provide cost tracking for VPN resource usage
 
 **Reliability and Performance**
-- **FR-023**: System MUST maintain 99.5% availability during business hours
+- **FR-023**: System MUST maintain 99.5% availability during business hours (defined as Monday-Friday 6:00 AM - 10:00 PM Eastern Time, excluding federal holidays)
 - **FR-024**: System MUST respond to status queries within 5 seconds
 - **FR-025**: System MUST handle VPN connection establishment within 30 seconds
 - **FR-026**: System MUST implement retry logic for transient cloud service failures
-- **FR-027**: System MUST support graceful degradation when cloud resources are temporarily unavailable
+- **FR-027**: System MUST support graceful degradation when cloud resources are temporarily unavailable (implemented via retry logic with exponential backoff per FR-026, returning 503 Service Unavailable with retry-after headers to clients)
 - **FR-028**: System MUST support a maximum of 3 concurrent VPN users
 
 **Data Management**

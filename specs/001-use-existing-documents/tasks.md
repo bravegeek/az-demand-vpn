@@ -57,6 +57,28 @@
 
 **CRITICAL: These tests MUST be written and MUST FAIL before ANY implementation**
 
+### 🚨 TDD ENFORCEMENT CHECKPOINT (Constitutional Principle IV)
+
+**BEFORE proceeding to Phase 3.3 (implementation), execute this validation:**
+
+```bash
+cd functions
+npm test 2>&1 | tee test-output.log
+
+# Expected output:
+# - Contract tests (T010-T013): 4 tests, 4 failed ❌
+# - Integration tests (T014-T019): 6 tests, 6 failed ❌
+# - Total: 10 tests, 10 failed ❌
+#
+# If ANY test passes or tests don't execute:
+#   STOP - Fix test setup before proceeding
+#
+# If all tests fail as expected:
+#   PROCEED to Phase 3.3 (Models)
+```
+
+**Rationale**: Constitution Principle IV requires tests fail (Red phase) before implementation (Green phase). This checkpoint ensures constitutional compliance and prevents accidental implementation-before-tests.
+
 ### Contract Tests (API Endpoint Validation)
 
 - [ ] **T010 [P]** Contract test POST `/api/vpn/start` in `tests/contract/provision.test.js` - validates StartVPN API contract (startvpn-api.yaml): request schema, response schema (200, 202, 400, 401, 409, 429, 503), authentication header, timeout validation (<2 min), concurrent request handling
@@ -79,9 +101,9 @@
 
 **ONLY after tests T010-T019 are failing**
 
-- [ ] **T020 [P]** VPNSession model in `functions/shared/models/vpn-session.js` - implements VPNSession entity from data-model.md with fields: sessionId (UUID), userId, status (enum: provisioning/active/idle/terminating/terminated), containerInstanceId, publicIpAddress, vpnPort (default 51820), createdAt, lastActivityAt, terminatedAt, idleTimeoutMinutes (default 10), provisionAttempts (max 3), errorMessage; includes validation rules and state transition logic
+- [ ] **T020 [P]** VPNSession model in `functions/shared/models/vpn-session.js` - implements VPNSession entity from data-model.md with fields: sessionId (UUID), userId, status (enum: provisioning/active/idle/terminating/terminated), containerInstanceId, publicIpAddress, vpnPort (default 51820, validation: 1024-65535 range), createdAt, lastActivityAt, terminatedAt, idleTimeoutMinutes (default 10), provisionAttempts (max 3), errorMessage; includes validation rules and state transition logic
 - [ ] **T021 [P]** ClientConfiguration model in `functions/shared/models/client-config.js` - implements ClientConfiguration entity with fields: configId (UUID), sessionId, userId, clientPublicKey, clientPrivateKey, clientIpAddress (10.8.0.0/24 subnet), serverPublicKey, serverEndpoint, allowedIPs, dnsServers, configFileContent (WireGuard format), qrCodeData (base64 PNG), createdAt, expiresAt, downloadToken (SAS); includes IP uniqueness validation
-- [ ] **T022 [P]** UserTenant model in `functions/shared/models/user-tenant.js` - implements UserTenant entity with fields: userId, email, displayName, authMethod (enum: apikey/azuread), apiKey (SHA-256 hash), azureAdObjectId, isActive, quotaMaxConcurrentSessions (1-3), quotaMaxSessionsPerDay, totalSessionsCreated, lastSessionAt, createdAt, updatedAt; includes quota enforcement logic
+- [ ] **T022 [P]** UserTenant model in `functions/shared/models/user-tenant.js` - implements UserTenant entity with fields: userId, email, displayName, authMethod (enum: apikey/azuread), apiKey (SHA-256 hash), azureAdObjectId, isActive, allowedSourceIPs (optional array of CIDR ranges for FR-014 IP restriction), quotaMaxConcurrentSessions (1-3), quotaMaxSessionsPerDay, totalSessionsCreated, lastSessionAt, createdAt, updatedAt; includes quota enforcement logic
 - [ ] **T023 [P]** OperationalEvent model in `functions/shared/models/operational-event.js` - implements OperationalEvent entity with fields: eventId (UUID), eventDate (YYYY-MM-DD for partitioning), timestamp, eventType (enum: vpn.provision.*, vpn.stop.*, vpn.connect.*, vpn.idle.*, auth.*, config.*), userId, sessionId, outcome (enum: success/failure/warning), message (max 2000 chars), metadata (JSON), ipAddress, durationMs; includes 5-day retention logic
 - [ ] **T024 [P]** InfrastructureState model in `functions/shared/models/infrastructure-state.js` - implements InfrastructureState singleton entity with fields: stateId (fixed: 'current'), activeContainerInstances (0-3), activeSessions (0-3), totalProvisioningAttempts, totalProvisioningFailures, totalBytesTransferred, currentCostEstimate, lastUpdated, quotaLimitReached; includes validation that activeSessions <= activeContainerInstances <= 3
 
@@ -102,7 +124,7 @@
 
 **Can run in parallel with T025-T028**
 
-- [ ] **T029 [P]** Authentication middleware in `functions/shared/utils/auth.js` - implements API key validation (reads from Key Vault), extracts userId from API key, enforces authentication on all endpoints (FR-011), logs auth success/failure events, returns 401 for invalid/missing keys; supports future Azure AD integration per research.md decision 5
+- [ ] **T029 [P]** Authentication middleware in `functions/shared/utils/auth.js` - implements API key validation (reads from Key Vault), extracts userId from API key, enforces authentication on all endpoints (FR-011), validates source IP against UserTenant.allowedSourceIPs if configured (FR-014), logs auth success/failure events, returns 401 for invalid/missing keys or unauthorized IP, returns 403 for valid key but IP restriction violation; supports future Azure AD integration per research.md decision 5
 - [ ] **T030 [P]** WireGuard configuration generator in `functions/shared/utils/wireguard-config.js` - generates WireGuard `.conf` file content using template format from `infra/container/scripts/generate-config.sh`, implements methods: `generateServerConfig(serverKeys, serverAddress, port)`, `generateClientConfig(clientKeys, clientIP, serverEndpoint, allowedIPs, dnsServers)`, validates WireGuard key format; integrates with existing container script logic
 - [ ] **T031 [P]** QR code generator utility in `functions/shared/utils/qr-code.js` - uses `qrcode` package to generate base64-encoded PNG QR codes from WireGuard config content (FR-010), implements method: `generateQRCode(configContent)` returning base64 string, optimizes size for mobile scanning
 - [ ] **T032 [P]** Validation utilities in `functions/shared/utils/validation.js` - implements input validation functions: `validateUUID(value)`, `validateIPv4(value)`, `validateIdleTimeout(minutes, min=1, max=1440)`, `validateSessionStatus(status, allowedStatuses)`, `validateQuota(current, max)`; returns detailed error messages for contract test validation (T010-T013)
@@ -126,7 +148,7 @@
 **Dependencies: T034-T037 (endpoints) must be complete**
 
 - [ ] **T038** Idle timeout monitor timer function in `functions/idle-monitor/index.js` - Azure Function timer trigger (runs every 1 minute per FR-003), queries VPNSession table for status='active' with `lastActivityAt + idleTimeoutMinutes < now`, updates each session status='idle', then triggers auto-shutdown (calls T039), logs operational events (type: `vpn.idle.detected`), updates metrics in Application Insights
-- [ ] **T039** Auto-shutdown function in `functions/auto-shutdown/index.js` - called by idle-monitor (T038), flow: load idle VPNSession → update status='terminating' → deprovision ACI via aci-service (T025) → update status='terminated' → decrement InfrastructureState counters (T024) → log operational event (type: `vpn.auto.shutdown`) → cleanup ClientConfiguration; enforces <1min termination (FR-002)
+- [ ] **T039** Auto-shutdown function in `functions/auto-shutdown/index.js` - called by idle-monitor (T038), flow: load idle VPNSession → update status='terminating' → deprovision ACI via aci-service (T025) with retry logic (if deprovision fails, retry up to 2 times with 5-second delay, then log to dead-letter queue for manual intervention) → update status='terminated' → decrement InfrastructureState counters (T024) → log operational event (type: `vpn.auto.shutdown`) → cleanup ClientConfiguration; enforces <1min termination (FR-002), handles edge case of shutdown failures
 - [ ] **T040** Activity heartbeat updater in `functions/shared/utils/activity-tracker.js` - utility called by status endpoint (T036) when querying active session, updates VPNSession.lastActivityAt to current timestamp to prevent premature idle timeout, implements debouncing (max 1 update per 30 seconds per session) to reduce Table Storage writes
 
 ---
@@ -146,7 +168,7 @@
 **Dependencies: All Phase 3.3-3.8 tasks must be complete**
 
 - [ ] **T044** Environment configuration loader in `functions/shared/config/environment.js` - loads configuration from environment variables and Key Vault, implements methods: `getConfig()` returning object with all settings (storage account name, Key Vault URL, ACR name, subscription ID, resource group, VNet/subnet IDs from Bicep outputs), `validateConfig()` ensuring all required vars present, caches config for function instance lifetime; references existing `infra/main.bicep` outputs
-- [ ] **T045** Update existing `infra/modules/function-app.bicep` to add app settings - add environment variables required by T044: `STORAGE_ACCOUNT_NAME`, `KEY_VAULT_URL`, `CONTAINER_REGISTRY_NAME`, `SUBSCRIPTION_ID`, `RESOURCE_GROUP_NAME`, `VPN_SUBNET_ID`, `ACR_LOGIN_SERVER` (from ACR module output), configure Managed Identity with RBAC roles: Key Vault Secrets User, Storage Blob Data Contributor, Storage Table Data Contributor, Contributor on resource group (for ACI provisioning)
+- [ ] **T045** Update existing `infra/modules/function-app.bicep` to add app settings - add environment variables required by T044: `STORAGE_ACCOUNT_NAME`, `KEY_VAULT_URL`, `CONTAINER_REGISTRY_NAME`, `SUBSCRIPTION_ID`, `RESOURCE_GROUP_NAME`, `VPN_SUBNET_ID`, `ACR_LOGIN_SERVER` (from ACR module output), configure Managed Identity with RBAC roles: Key Vault Secrets User, Storage Blob Data Contributor, Storage Table Data Contributor, Contributor on resource group (for ACI provisioning); set Function timeout to 180 seconds (3 minutes) to accommodate FR-001 2-minute provision requirement with buffer, configure Application Insights alert when provision operations exceed 120 seconds
 - [ ] **T046** Container build integration script in `infra/container/push-to-acr.ps1` - PowerShell script to build WireGuard container using existing `infra/container/Dockerfile` and push to ACR, references existing `infra/container/build.ps1`, adds ACR login and push commands, tags image as `vpn-wireguard:latest` and `vpn-wireguard:{version}`, verifies image uploaded successfully; integrates with existing ACR from `infra/modules/container-registry.bicep`
 - [ ] **T047** Function deployment script in `functions/deploy.ps1` - PowerShell script to deploy Azure Functions code: install Node.js dependencies (`npm ci`), run tests (`npm test`), bundle functions, deploy to Function App using `func azure functionapp publish {functionAppName}`, verify deployment success; references function app created by `infra/modules/function-app.bicep`
 
