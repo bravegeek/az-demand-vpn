@@ -4,6 +4,10 @@ module.exports = {
   testMatch: [
     '<rootDir>/tests/**/*.test.js'
   ],
+  moduleDirectories: [
+    'node_modules',
+    'functions/node_modules'
+  ],
   collectCoverageFrom: [
     'functions/shared/**/*.js',
     'functions/provision/**/*.js',
