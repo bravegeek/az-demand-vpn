@@ -81,10 +81,10 @@ npm test 2>&1 | tee test-output.log
 
 ### Contract Tests (API Endpoint Validation)
 
-- [ ] **T010 [P]** Contract test POST `/api/vpn/start` in `tests/contract/provision.test.js` - validates StartVPN API contract (startvpn-api.yaml): request schema, response schema (200, 202, 400, 401, 409, 429, 503), authentication header, timeout validation (<2 min), concurrent request handling
-- [ ] **T011 [P]** Contract test POST `/api/vpn/stop` in `tests/contract/deprovision.test.js` - validates StopVPN API contract (stopvpn-api.yaml): request schema with sessionId, response schema (200, 202, 400, 401, 404, 409), timeout validation (<1 min), state transition validation
-- [ ] **T012 [P]** Contract test GET `/api/vpn/status/{sessionId}` in `tests/contract/status.test.js` - validates StatusVPN API contract (statusvpn-api.yaml): path parameter validation, response schema (200, 400, 401, 404), query timeout (<5 sec), health status enum validation, metrics format
-- [ ] **T013 [P]** Contract test GET `/api/vpn/status` (list all sessions) in `tests/contract/status-list.test.js` - validates session list endpoint: query parameter filtering, pagination, response array schema, totalCount/activeCount fields
+- [X] **T010 [P]** Contract test POST `/api/vpn/start` in `tests/contract/provision.test.js` - validates StartVPN API contract (startvpn-api.yaml): request schema, response schema (200, 202, 400, 401, 409, 429, 503), authentication header, timeout validation (<2 min), concurrent request handling
+- [X] **T011 [P]** Contract test POST `/api/vpn/stop` in `tests/contract/deprovision.test.js` - validates StopVPN API contract (stopvpn-api.yaml): request schema with sessionId, response schema (200, 202, 400, 401, 404, 409), timeout validation (<1 min), state transition validation
+- [X] **T012 [P]** Contract test GET `/api/vpn/status/{sessionId}` in `tests/contract/status.test.js` - validates StatusVPN API contract (statusvpn-api.yaml): path parameter validation, response schema (200, 400, 401, 404), query timeout (<5 sec), health status enum validation, metrics format
+- [X] **T013 [P]** Contract test GET `/api/vpn/status` (list all sessions) in `tests/contract/status-list.test.js` - validates session list endpoint: query parameter filtering, pagination, response array schema, totalCount/activeCount fields
 
 ### Integration Tests (End-to-End Scenarios from quickstart.md)
 
