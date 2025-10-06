@@ -1,14 +1,15 @@
 module.exports = {
   testEnvironment: 'node',
+  rootDir: '../',
   testMatch: [
-    '**/tests/**/*.test.js'
+    '<rootDir>/tests/**/*.test.js'
   ],
   collectCoverageFrom: [
-    'shared/**/*.js',
-    'provision/**/*.js',
-    'deprovision/**/*.js',
-    'status/**/*.js',
-    'config/**/*.js',
+    'functions/shared/**/*.js',
+    'functions/provision/**/*.js',
+    'functions/deprovision/**/*.js',
+    'functions/status/**/*.js',
+    'functions/config/**/*.js',
     '!**/node_modules/**'
   ],
   coverageThreshold: {
@@ -20,5 +21,6 @@ module.exports = {
     }
   },
   testTimeout: 30000,
-  verbose: true
+  verbose: true,
+  setupFilesAfterEnv: ['<rootDir>/functions/jest.setup.js']
 };
