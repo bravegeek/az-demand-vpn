@@ -41,15 +41,15 @@
 
 ## Phase 3.1: Setup & Project Structure
 
-- [ ] **T001** Create `functions/` directory structure with subdirectories: `provision/`, `deprovision/`, `status/`, `config/`, `shared/models/`, `shared/services/`, `shared/utils/`
-- [ ] **T002** Initialize Node.js project with `package.json` in `functions/` directory with name "az-demand-vpn-functions", version "1.0.0", Node.js 18+ engine requirement
-- [ ] **T003** Install Azure Functions dependencies: `@azure/functions@^4.0.0`, `@azure/arm-containerinstance@^9.0.0`, `@azure/identity@^4.0.0`, `@azure/keyvault-secrets@^4.7.0`, `@azure/storage-blob@^12.17.0`, `@azure/data-tables@^13.2.0` in `functions/package.json`
-- [ ] **T004 [P]** Install utility dependencies: `qrcode@^1.5.3`, `uuid@^9.0.0` in `functions/package.json`
-- [ ] **T005 [P]** Install development dependencies: `jest@^29.7.0`, `@types/jest@^29.5.0`, `eslint@^8.54.0` in `functions/package.json`
-- [ ] **T006** Create Azure Functions configuration file `functions/host.json` with version 4.0, Node.js 18 runtime, Application Insights integration, and HTTP routing configuration
-- [ ] **T007** Create local settings template `functions/local.settings.json.template` with placeholders for: `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `STORAGE_ACCOUNT_NAME`, `KEY_VAULT_URL`, `CONTAINER_REGISTRY_NAME`, `APPINSIGHTS_INSTRUMENTATIONKEY`
-- [ ] **T008 [P]** Configure ESLint in `functions/.eslintrc.json` with JavaScript standard style, Node.js environment, async/await support
-- [ ] **T009 [P]** Configure Jest in `functions/jest.config.js` with coverage thresholds (80% minimum), test environment "node", timeout 30000ms for integration tests
+- [X] **T001** Create `functions/` directory structure with subdirectories: `provision/`, `deprovision/`, `status/`, `config/`, `shared/models/`, `shared/services/`, `shared/utils/`
+- [X] **T002** Initialize Node.js project with `package.json` in `functions/` directory with name "az-demand-vpn-functions", version "1.0.0", Node.js 18+ engine requirement
+- [X] **T003** Install Azure Functions dependencies: `@azure/functions@^4.0.0`, `@azure/arm-containerinstance@^9.0.0`, `@azure/identity@^4.0.0`, `@azure/keyvault-secrets@^4.7.0`, `@azure/storage-blob@^12.17.0`, `@azure/data-tables@^13.2.0` in `functions/package.json`
+- [X] **T004 [P]** Install utility dependencies: `qrcode@^1.5.3`, `uuid@^9.0.0` in `functions/package.json`
+- [X] **T005 [P]** Install development dependencies: `jest@^29.7.0`, `@types/jest@^29.5.0`, `eslint@^8.54.0` in `functions/package.json`
+- [X] **T006** Create Azure Functions configuration file `functions/host.json` with version 4.0, Node.js 18 runtime, Application Insights integration, and HTTP routing configuration
+- [X] **T007** Create local settings template `functions/local.settings.json.template` with placeholders for: `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `STORAGE_ACCOUNT_NAME`, `KEY_VAULT_URL`, `CONTAINER_REGISTRY_NAME`, `APPINSIGHTS_INSTRUMENTATIONKEY`
+- [X] **T008 [P]** Configure ESLint in `functions/.eslintrc.json` with JavaScript standard style, Node.js environment, async/await support
+- [X] **T009 [P]** Configure Jest in `functions/jest.config.js` with coverage thresholds (80% minimum), test environment "node", timeout 30000ms for integration tests
 
 ---
 

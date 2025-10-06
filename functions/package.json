@@ -1,0 +1,37 @@
+{
+  "name": "az-demand-vpn-functions",
+  "version": "1.0.0",
+  "description": "On-Demand VPN Provisioning System - Azure Functions",
+  "main": "index.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "test": "jest",
+    "lint": "eslint .",
+    "start": "func start"
+  },
+  "keywords": [
+    "vpn",
+    "wireguard",
+    "azure",
+    "functions"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@azure/arm-containerinstance": "^9.1.0",
+    "@azure/data-tables": "^13.3.1",
+    "@azure/functions": "^4.8.0",
+    "@azure/identity": "^4.12.0",
+    "@azure/keyvault-secrets": "^4.10.0",
+    "@azure/storage-blob": "^12.28.0",
+    "qrcode": "^1.5.4",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "eslint": "^8.57.1",
+    "jest": "^29.7.0"
+  }
+}

@@ -37,6 +37,11 @@ ENV/
 *.pfx
 *.publishsettings
 
+# Node.js
+node_modules/
+package-lock.json
+functions/local.settings.json
+
 # IDE
 .vscode/
 .idea/

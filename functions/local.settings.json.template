@@ -1,0 +1,13 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "AZURE_TENANT_ID": "<your-azure-tenant-id>",
+    "AZURE_SUBSCRIPTION_ID": "<your-azure-subscription-id>",
+    "STORAGE_ACCOUNT_NAME": "<your-storage-account-name>",
+    "KEY_VAULT_URL": "https://<your-keyvault-name>.vault.azure.net/",
+    "CONTAINER_REGISTRY_NAME": "<your-acr-name>",
+    "APPINSIGHTS_INSTRUMENTATIONKEY": "<your-appinsights-key>"
+  }
+}
