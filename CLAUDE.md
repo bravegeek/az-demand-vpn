@@ -49,6 +49,18 @@ This project spans three domains. Apply the relevant framing based on the task:
 - Security-first: least-privilege RBAC, no secrets in code, use Key Vault references
 - Resource group: `az-demand-vpn-rg`, Region: East US 2
 
+## Local RAG Index
+
+All project docs are indexed in the local RAG server. Query it first for any conceptual or architectural questions before reading files directly:
+
+- Architecture, design decisions, component relationships → RAG
+- WireGuard config, ACI lifecycle, Azure Functions patterns → RAG
+- Phase status, roadmap, task lists → RAG
+- Exact code searches (function names, specific strings) → `Grep`
+- Finding files by pattern → `Glob`
+
+Indexed documents: `CLAUDE.md`, `docs/architecture-design.md`, `docs/wireguard-implementation.md`, `docs/javascript-implementation-guide.md`, `docs/project-roadmap.md`, `docs/specs/mvp-wireguard-container-spec.md`, `docs/infrastructure-tasks.md`, `infra/README.md`, `infra/container/README.md`, all persona docs, `infra/main.bicep`.
+
 ## Repo Structure
 
 ```
