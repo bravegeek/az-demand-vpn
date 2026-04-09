@@ -74,3 +74,7 @@ crash.*.log
 
 # old files
 old/
+
+# local rag
+lancedb/
+models/
