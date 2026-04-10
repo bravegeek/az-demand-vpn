@@ -81,7 +81,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
       defaultAction: 'Deny'
       virtualNetworkRules: [
         {
-          virtualNetworkResourceId: vnetId
+          id: vnetId
           action: 'Allow'
         }
       ]
@@ -92,9 +92,15 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   }
 }
 
+// Blob service (required as intermediate parent for containers)
+resource blobServices 'Microsoft.Storage/storageAccounts/blobServices@2023-01-01' = {
+  parent: storageAccount
+  name: 'default'
+}
+
 // Blob containers for VPN configuration
 resource vpnConfigsContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
-  parent: storageAccount
+  parent: blobServices
   name: 'vpn-configs'
   properties: {
     publicAccess: 'None'
@@ -106,7 +112,7 @@ resource vpnConfigsContainer 'Microsoft.Storage/storageAccounts/blobServices/con
 }
 
 resource vpnKeysContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
-  parent: storageAccount
+  parent: blobServices
   name: 'vpn-keys'
   properties: {
     publicAccess: 'None'
@@ -118,7 +124,7 @@ resource vpnKeysContainer 'Microsoft.Storage/storageAccounts/blobServices/contai
 }
 
 resource vpnLogsContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
-  parent: storageAccount
+  parent: blobServices
   name: 'vpn-logs'
   properties: {
     publicAccess: 'None'

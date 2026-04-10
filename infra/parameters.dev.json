@@ -14,16 +14,8 @@
     "vpnConfig": {
       "value": {
         "wireguardPort": 51820,
-        "openvpnPort": 1194,
         "maxConnections": 50,
         "idleTimeoutMinutes": 30
-      }
-    },
-    "acrConfig": {
-      "value": {
-        "sku": "Basic",
-        "adminUserEnabled": false,
-        "geoReplication": false
       }
     },
     "storageConfig": {
@@ -45,10 +37,8 @@
     },
     "functionConfig": {
       "value": {
-        "runtime": "dotnet",
-        "version": "6",
-        "planSku": "P1V2",
-        "alwaysOn": true
+        "runtime": "node",
+        "version": "20"
       }
     },
     "networkConfig": {

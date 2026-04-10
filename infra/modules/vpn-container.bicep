@@ -1,3 +1,7 @@
+// runtime-only: used by StartVPN function via @azure/arm-containerinstance
+// This template is NOT deployed by main.bicep. It documents the container group
+// spec that StartVPN creates at runtime. See src/functions/StartVPN/index.js.
+
 @description('VPN Container for Azure Container Instances')
 @minLength(1)
 @maxLength(63)
@@ -12,9 +16,6 @@ param tags object = {}
 @description('Subnet ID for VNet integration')
 param subnetId string
 
-@description('Container Registry ID')
-param containerRegistryId string
-
 @description('Storage Account ID')
 param storageAccountId string
 
@@ -24,14 +25,11 @@ param keyVaultId string
 @description('WireGuard VPN port')
 param wireguardPort int = 51820
 
-@description('OpenVPN port')
-param openvpnPort int = 1194
-
 @description('Maximum connections')
 param maxConnections int = 100
 
-@description('Container image')
-param containerImage string = 'wireguard/wireguard:latest'
+@description('Container image — public GHCR image, no credentials required')
+param containerImage string = 'ghcr.io/<your-github-org>/az-demand-vpn-wg:latest'
 
 @description('Container CPU cores')
 param cpuCores int = 1
@@ -43,23 +41,25 @@ param memoryInGB int = 2
 @allowed(['Always', 'Never', 'OnFailure'])
 param restartPolicy string = 'Always'
 
-@description('Enable managed identity')
-param enableManagedIdentity bool = true
-
 @description('Enable VNet integration')
 param enableVNetIntegration bool = true
 
 @description('Enable public IP')
 param enablePublicIP bool = true
 
+var storageAccountName = last(split(storageAccountId, '/'))
+
 // Container Group
+// NOTE: storageAccountKey uses listKeys() because ACI Azure Files mounts do not
+// yet support managed identity auth. The key is used only for the volume mount
+// resource property and is not stored in app settings or Key Vault.
 resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01' = {
   name: name
   location: location
   tags: tags
-  identity: enableManagedIdentity ? {
+  identity: {
     type: 'SystemAssigned'
-  } : null
+  }
   properties: {
     containers: [
       {
@@ -78,10 +78,6 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
               protocol: 'UDP'
             }
             {
-              port: openvpnPort
-              protocol: 'UDP'
-            }
-            {
               port: 443
               protocol: 'TCP'
             }
@@ -97,7 +93,7 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
             }
             {
               name: 'STORAGE_ACCOUNT'
-              value: last(split(storageAccountId, '/'))
+              value: storageAccountName
             }
             {
               name: 'KEY_VAULT'
@@ -119,29 +115,16 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
             }
           ]
           livenessProbe: {
-            httpGet: {
-              path: '/health'
-              port: 8080
+            exec: {
+              command: [
+                'wg'
+                'show'
+              ]
             }
-            initialDelaySeconds: 30
-            periodSeconds: 10
-          }
-          readinessProbe: {
-            httpGet: {
-              path: '/ready'
-              port: 8080
-            }
-            initialDelaySeconds: 5
-            periodSeconds: 5
+            initialDelaySeconds: 10
+            periodSeconds: 30
           }
         }
-      }
-    ]
-    imageRegistryCredentials: [
-      {
-        server: last(split(containerRegistryId, '/'))
-        username: '${last(split(containerRegistryId, '/'))}'
-        password: '${last(split(containerRegistryId, '/'))}'
       }
     ]
     restartPolicy: restartPolicy
@@ -151,10 +134,6 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
         {
           protocol: 'UDP'
           port: wireguardPort
-        }
-        {
-          protocol: 'UDP'
-          port: openvpnPort
         }
         {
           protocol: 'TCP'
@@ -173,24 +152,24 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01'
         name: 'vpn-config'
         azureFile: {
           shareName: 'vpn-configs'
-          storageAccountName: last(split(storageAccountId, '/'))
-          storageAccountKey: last(split(storageAccountId, '/'))
+          storageAccountName: storageAccountName
+          storageAccountKey: listKeys(storageAccountId, '2023-01-01').keys[0].value
         }
       }
       {
         name: 'vpn-keys'
         azureFile: {
           shareName: 'vpn-keys'
-          storageAccountName: last(split(storageAccountId, '/'))
-          storageAccountKey: last(split(storageAccountId, '/'))
+          storageAccountName: storageAccountName
+          storageAccountKey: listKeys(storageAccountId, '2023-01-01').keys[0].value
         }
       }
       {
         name: 'vpn-logs'
         azureFile: {
           shareName: 'vpn-logs'
-          storageAccountName: last(split(storageAccountId, '/'))
-          storageAccountKey: last(split(storageAccountId, '/'))
+          storageAccountName: storageAccountName
+          storageAccountKey: listKeys(storageAccountId, '2023-01-01').keys[0].value
         }
       }
     ]

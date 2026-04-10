@@ -21,16 +21,8 @@ param tags object = {
 @description('VPN configuration parameters')
 param vpnConfig object = {
   wireguardPort: 51820
-  openvpnPort: 1194
   maxConnections: 100
   idleTimeoutMinutes: 30
-}
-
-@description('Container registry configuration')
-param acrConfig object = {
-  sku: 'Basic'
-  adminUserEnabled: false
-  geoReplication: false
 }
 
 @description('Storage account configuration')
@@ -52,10 +44,8 @@ param keyVaultConfig object = {
 
 @description('Function App configuration')
 param functionConfig object = {
-  runtime: 'dotnet'
-  version: '6'
-  planSku: 'P1v2'
-  alwaysOn: true
+  runtime: 'node'
+  version: '20'
 }
 
 @description('Network configuration')
@@ -66,13 +56,12 @@ param networkConfig object = {
   endpointsSubnetPrefix: '10.0.3.0/24'
 }
 
-// Generate unique names for resources
+// Generate unique names for resources (capped to service limits)
 var uniqueSuffix = uniqueString(resourceGroup().id, projectName, environment)
 var resourceNames = {
   resourceGroup: resourceGroup().name
-  acr: 'acr${projectName}${uniqueSuffix}'
-  storage: 'st${projectName}${uniqueSuffix}'
-  keyVault: 'kv${projectName}${uniqueSuffix}'
+  storage: substring('st${projectName}${uniqueSuffix}', 0, 24)
+  keyVault: substring('kv${projectName}${uniqueSuffix}', 0, 24)
   functionApp: 'func${projectName}${uniqueSuffix}'
   vnet: 'vnet-${projectName}'
   logAnalytics: 'law${projectName}${uniqueSuffix}'
@@ -111,23 +100,11 @@ module network 'modules/network.bicep' = {
     functionsSubnetPrefix: networkConfig.functionsSubnetPrefix
     endpointsSubnetPrefix: networkConfig.endpointsSubnetPrefix
     wireguardPort: vpnConfig.wireguardPort
-    openvpnPort: vpnConfig.openvpnPort
     tags: tags
   }
 }
 
-// Deploy Azure Container Registry
-module acr 'modules/container-registry.bicep' = {
-  name: 'acr'
-  params: {
-    name: resourceNames.acr
-    location: location
-    sku: acrConfig.sku
-    adminUserEnabled: acrConfig.adminUserEnabled
-    geoReplication: acrConfig.geoReplication
-    tags: tags
-  }
-}
+// TODO: Add ACR as optional private registry for private image hosting — see design.md Decision 1
 
 // Deploy Storage Account
 module storage 'modules/storage.bicep' = {
@@ -170,8 +147,6 @@ module functionApp 'modules/function-app.bicep' = {
     location: location
     runtime: functionConfig.runtime
     version: functionConfig.version
-    planSku: functionConfig.planSku
-    alwaysOn: functionConfig.alwaysOn
     subnetId: network.outputs.functionsSubnetId
     storageAccountId: storage.outputs.storageAccountId
     keyVaultId: keyVault.outputs.keyVaultId
@@ -180,20 +155,39 @@ module functionApp 'modules/function-app.bicep' = {
   }
 }
 
-// Deploy VPN Container Template (for ACI deployments)
-module vpnContainer 'modules/vpn-container.bicep' = {
-  name: 'vpnContainer'
-  params: {
-    name: 'vpn-${projectName}-${environment}'
-    location: location
-    subnetId: network.outputs.vpnSubnetId
-    containerRegistryId: acr.outputs.containerRegistryId
-    storageAccountId: storage.outputs.storageAccountId
-    keyVaultId: keyVault.outputs.keyVaultId
-    wireguardPort: vpnConfig.wireguardPort
-    openvpnPort: vpnConfig.openvpnPort
-    maxConnections: vpnConfig.maxConnections
-    tags: tags
+// RBAC role assignments: Function App managed identity → Storage Account
+var storageBlobDataOwnerRoleId = 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
+var storageQueueDataContributorRoleId = '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
+var storageTableDataContributorRoleId = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
+
+resource funcStorageBlobRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  // # Reason: guid() name uses resourceNames vars (pre-computable); principalId from output is fine for properties
+  name: guid(resourceNames.storage, resourceNames.functionApp, storageBlobDataOwnerRoleId)
+  scope: resourceGroup()
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataOwnerRoleId)
+    principalId: functionApp.outputs.managedIdentityPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource funcStorageQueueRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(resourceNames.storage, resourceNames.functionApp, storageQueueDataContributorRoleId)
+  scope: resourceGroup()
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageQueueDataContributorRoleId)
+    principalId: functionApp.outputs.managedIdentityPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource funcStorageTableRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(resourceNames.storage, resourceNames.functionApp, storageTableDataContributorRoleId)
+  scope: resourceGroup()
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageTableDataContributorRoleId)
+    principalId: functionApp.outputs.managedIdentityPrincipalId
+    principalType: 'ServicePrincipal'
   }
 }
 
@@ -204,7 +198,6 @@ module monitoring 'modules/monitoring.bicep' = {
     location: location
     logAnalyticsWorkspaceId: logAnalytics.outputs.workspaceId
     functionAppId: functionApp.outputs.functionAppId
-    vpnContainerId: vpnContainer.outputs.containerGroupId
     tags: tags
   }
 }
@@ -212,13 +205,9 @@ module monitoring 'modules/monitoring.bicep' = {
 // Outputs
 output resourceGroupName string = resourceGroup().name
 output location string = location
-output containerRegistryName string = resourceNames.acr
-output containerRegistryLoginServer string = acr.outputs.loginServer
 output storageAccountName string = resourceNames.storage
 output keyVaultName string = resourceNames.keyVault
 output functionAppName string = resourceNames.functionApp
 output virtualNetworkName string = resourceNames.vnet
 output logAnalyticsWorkspaceName string = resourceNames.logAnalytics
 output applicationInsightsName string = resourceNames.appInsights
-output vpnContainerGroupName string = vpnContainer.outputs.containerGroupName
-output vpnContainerGroupId string = vpnContainer.outputs.containerGroupId

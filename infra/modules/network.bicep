@@ -24,9 +24,6 @@ param endpointsSubnetPrefix string = '10.0.3.0/24'
 @description('WireGuard VPN port')
 param wireguardPort int = 51820
 
-@description('OpenVPN port')
-param openvpnPort int = 1194
-
 // Virtual Network
 resource virtualNetwork 'Microsoft.Network/virtualNetworks@2023-09-01' = {
   name: name
@@ -65,9 +62,10 @@ resource virtualNetwork 'Microsoft.Network/virtualNetworks@2023-09-01' = {
           }
           delegations: [
             {
-              name: 'Microsoft.Web.serverFarms'
+              // Flex Consumption Functions require Microsoft.App/environments delegation
+              name: 'Microsoft.App.environments'
               properties: {
-                serviceName: 'Microsoft.Web/serverFarms'
+                serviceName: 'Microsoft.App/environments'
               }
             }
           ]
@@ -104,19 +102,6 @@ resource vpnNsg 'Microsoft.Network/networkSecurityGroups@2023-09-01' = {
           sourcePortRange: '*'
           destinationAddressPrefix: '*'
           destinationPortRange: string(wireguardPort)
-        }
-      }
-      {
-        name: 'AllowOpenVPN'
-        properties: {
-          priority: 110
-          protocol: 'Udp'
-          access: 'Allow'
-          direction: 'Inbound'
-          sourceAddressPrefix: '*'
-          sourcePortRange: '*'
-          destinationAddressPrefix: '*'
-          destinationPortRange: string(openvpnPort)
         }
       }
       {

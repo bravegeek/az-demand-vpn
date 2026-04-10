@@ -10,9 +10,6 @@ param logAnalyticsWorkspaceId string
 @description('Function App ID')
 param functionAppId string
 
-@description('VPN Container ID')
-param vpnContainerId string
-
 @description('Enable monitoring alerts')
 param enableAlerts bool = true
 
@@ -45,42 +42,6 @@ resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = if (enableAl
     logicAppReceivers: []
     azureFunctionReceivers: []
     armRoleReceivers: []
-  }
-}
-
-// VPN Container Health Alert
-resource vpnHealthAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = if (enableAlerts) {
-  name: 'vpn-container-health'
-  location: 'global'
-  tags: tags
-  properties: {
-    description: 'Alert when VPN container is unhealthy'
-    severity: 2
-    enabled: true
-    scopes: [
-      vpnContainerId
-    ]
-    evaluationFrequency: 'PT5M'
-    windowSize: 'PT5M'
-    criteria: {
-      'odata.type': 'Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria'
-      allOf: [
-        {
-          name: 'High CPU Usage'
-          metricName: 'CpuPercentage'
-          operator: 'GreaterThan'
-          threshold: 80
-          timeAggregation: 'Average'
-          criterionType: 'StaticThresholdCriterion'
-        }
-      ]
-    }
-    actions: [
-      {
-        actionGroupId: actionGroup.id
-        webhookProperties: {}
-      }
-    ]
   }
 }
 

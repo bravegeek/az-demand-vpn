@@ -10,18 +10,11 @@ param location string = resourceGroup().location
 param tags object = {}
 
 @description('Runtime stack')
-@allowed(['dotnet', 'node', 'python', 'java', 'powershell', 'custom'])
-param runtime string = 'dotnet'
+@allowed(['node', 'python', 'java', 'powershell', 'custom'])
+param runtime string = 'node'
 
 @description('Runtime version')
-param version string = '6'
-
-@description('App Service Plan SKU')
-@allowed(['F1', 'D1', 'B1', 'B2', 'B3', 'S1', 'S2', 'S3', 'P1V2', 'P2V2', 'P3V2', 'P1V3', 'P2V3', 'P3V3'])
-param planSku string = 'P1V2'
-
-@description('Always on setting')
-param alwaysOn bool = true
+param version string = '20'
 
 @description('Subnet ID for VNet integration')
 param subnetId string
@@ -35,93 +28,55 @@ param keyVaultId string
 @description('Application Insights ID')
 param appInsightsId string
 
-@description('Enable managed identity')
-param enableManagedIdentity bool = true
+var storageAccountName = last(split(storageAccountId, '/'))
 
-@description('Enable VNet integration')
-param enableVNetIntegration bool = true
-
-@description('Enable private endpoints')
-param enablePrivateEndpoints bool = false
-
-@description('Private endpoints subnet ID')
-param privateEndpointsSubnetId string = ''
-
-// App Service Plan
-resource appServicePlan 'Microsoft.Web/serverfarms@2023-01-01' = {
+// Flex Consumption App Service Plan — supports VNet integration at Consumption pricing
+resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
   name: '${name}-plan'
   location: location
   tags: tags
   sku: {
-    name: planSku
-    tier: contains(planSku, 'F') ? 'Free' : contains(planSku, 'B') ? 'Basic' : contains(planSku, 'S') ? 'Standard' : 'PremiumV2'
+    name: 'FC1'
+    tier: 'FlexConsumption'
   }
   kind: 'functionapp'
   properties: {
     reserved: true
-    perSiteScaling: false
-    elasticScaleEnabled: false
-    maximumElasticWorkerCount: 1
   }
 }
 
 // Function App
-resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
+resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
   name: name
   location: location
   tags: tags
-  kind: 'functionapp'
-  identity: enableManagedIdentity ? {
+  kind: 'functionapp,linux'
+  identity: {
     type: 'SystemAssigned'
-  } : null
+  }
   properties: {
     serverFarmId: appServicePlan.id
-    reserved: true
     siteConfig: {
       appSettings: [
         {
-          name: 'AzureWebJobsStorage'
-          value: 'DefaultEndpointsProtocol=https;AccountName=${last(split(storageAccountId, '/'))};AccountKey=${last(split(storageAccountId, '/'))};EndpointSuffix=core.windows.net'
+          name: 'AzureWebJobsStorage__accountName'
+          value: storageAccountName
         }
         {
-          name: 'FUNCTIONS_EXTENSION_VERSION'
-          value: '~${version}'
-        }
-        {
-          name: 'FUNCTIONS_WORKER_RUNTIME'
-          value: runtime
-        }
-        {
-          name: 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING'
-          value: 'DefaultEndpointsProtocol=https;AccountName=${last(split(storageAccountId, '/'))};AccountKey=${last(split(storageAccountId, '/'))};EndpointSuffix=core.windows.net'
-        }
-        {
-          name: 'WEBSITE_CONTENTSHARE'
-          value: name
-        }
-        {
-          name: 'WEBSITE_NODE_DEFAULT_VERSION'
-          value: '~18'
-        }
-        {
-          name: 'WEBSITE_RUN_FROM_PACKAGE'
-          value: '1'
-        }
-        {
-          name: 'APPINSIGHTS_INSTRUMENTATIONKEY'
-          value: last(split(appInsightsId, '/'))
+          name: 'AzureWebJobsStorage__credential'
+          value: 'managedidentity'
         }
         {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
-          value: last(split(appInsightsId, '/'))
+          value: reference(appInsightsId, '2020-02-02').ConnectionString
         }
         {
           name: 'KeyVaultUri'
-          value: last(split(keyVaultId, '/'))
+          value: 'https://${last(split(keyVaultId, '/'))}.vault.azure.net/'
         }
         {
           name: 'StorageAccountName'
-          value: last(split(storageAccountId, '/'))
+          value: storageAccountName
         }
       ]
       ftpsState: 'Disabled'
@@ -133,46 +88,32 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         ]
         supportCredentials: true
       }
-      vnetRouteAllEnabled: enableVNetIntegration
-      vnetName: last(split(subnetId, '/'))
-      vnetSubnetName: last(split(subnetId, '/'))
     }
-    httpsOnly: true
-    clientAffinityEnabled: false
-    dailyMemoryTimeQuota: 0
-  }
-}
-
-// VNet Integration
-resource vnetIntegration 'Microsoft.Web/sites/networkConfig@2023-01-01' = if (enableVNetIntegration) {
-  parent: functionApp
-  name: 'virtualNetwork'
-  properties: {
-    subnetResourceId: subnetId
-    swiftSupported: true
-  }
-}
-
-// Private endpoint for Function App (if enabled)
-resource functionPrivateEndpoint 'Microsoft.Network/privateEndpoints@2023-09-01' = if (enablePrivateEndpoints) {
-  name: '${name}-pe'
-  location: location
-  tags: tags
-  properties: {
-    subnet: {
-      id: privateEndpointsSubnetId
-    }
-    privateLinkServiceConnections: [
-      {
-        name: '${name}-pls'
-        properties: {
-          privateLinkServiceId: functionApp.id
-          groupIds: [
-            'sites'
-          ]
+    // Flex Consumption: runtime and deployment storage configured here, not in appSettings
+    functionAppConfig: {
+      deployment: {
+        storage: {
+          type: 'blobContainer'
+          value: 'https://${storageAccountName}.blob.core.windows.net/azure-webjobs-hosts'
+          authentication: {
+            type: 'SystemAssignedIdentity'
+          }
         }
       }
-    ]
+      scaleAndConcurrency: {
+        maximumInstanceCount: 100
+        instanceMemoryMB: 2048
+      }
+      runtime: {
+        name: runtime
+        version: version
+      }
+    }
+    // Flex Consumption VNet integration: set subnet directly on site properties
+    // NOTE: subnet delegation must be Microsoft.App/environments (not Microsoft.Web/serverFarms)
+    virtualNetworkSubnetId: subnetId
+    httpsOnly: true
+    clientAffinityEnabled: false
   }
 }
 

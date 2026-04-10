@@ -172,9 +172,36 @@ main() {
     log "WireGuard configuration generation completed successfully"
 }
 
-# Function to generate client config when called with parameters
-if [[ $# -eq 4 ]]; then
-    generate_specific_client_config "$1" "$2" "$3" "$4"
+# Calling convention:
+#   generate-config.sh                                              — server config mode (uses env vars)
+#   generate-config.sh <srv-pubkey> <endpoint> <peer-pubkey> <peer-addr> [output-file]  — client config mode
+#
+# Client config mode is called by the StartVPN Azure Function to produce a
+# wg-quick compatible config to return to the connecting client.
+if [[ $# -ge 4 ]]; then
+    SERVER_PUBLIC_KEY_ARG="$1"
+    SERVER_ENDPOINT_ARG="$2"
+    PEER_PUBLIC_KEY_ARG="$3"
+    PEER_ADDRESS_ARG="$4"
+    OUTPUT_FILE_ARG="${5:-}"
+
+    config="[Interface]
+Address = ${PEER_ADDRESS_ARG}
+DNS = 1.1.1.1
+
+[Peer]
+PublicKey = ${SERVER_PUBLIC_KEY_ARG}
+Endpoint = ${SERVER_ENDPOINT_ARG}
+AllowedIPs = 0.0.0.0/0, ::/0
+PersistentKeepalive = 25"
+
+    if [[ -n "${OUTPUT_FILE_ARG}" ]]; then
+        echo "${config}" > "${OUTPUT_FILE_ARG}"
+        chmod 600 "${OUTPUT_FILE_ARG}"
+        log "Client config written to ${OUTPUT_FILE_ARG}"
+    else
+        echo "${config}"
+    fi
 else
     main "$@"
 fi
