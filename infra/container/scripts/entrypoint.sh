@@ -23,9 +23,11 @@ for required in WG_SERVER_PRIVATE_KEY; do
     exit 1
   fi
 done
+export WG_SERVER_PRIVATE_KEY
 
-WG_SERVER_PORT="${WG_SERVER_PORT:-51820}"
-WG_SERVER_ADDRESS="${WG_SERVER_ADDRESS:-10.8.0.1/24}"
+# Export so generate-config.sh inherits these values
+export WG_SERVER_PORT="${WG_SERVER_PORT:-51820}"
+export WG_SERVER_ADDRESS="${WG_SERVER_ADDRESS:-10.8.0.1}"  # without CIDR — generate-config.sh appends /24
 
 log "Generating WireGuard server configuration..."
 /scripts/generate-config.sh

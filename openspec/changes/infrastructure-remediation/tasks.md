@@ -39,8 +39,8 @@
 - [x] 5.1 Create `infra/container/scripts/entrypoint.sh` — init WireGuard interface, enable IP forwarding, configure iptables NAT, block until stopped
 - [x] 5.2 Create `infra/container/scripts/generate-config.sh` — generate `wg-quick`-compatible peer config from server pubkey, endpoint, and peer pubkey args
 - [x] 5.3 Create `infra/container/scripts/health-check.sh` — run `wg show`, exit 0 if interface up, non-zero otherwise
-- [ ] 5.4 Run `docker build -t az-demand-vpn-wg infra/container/` — verify build succeeds (run manually)
-- [ ] 5.5 Run container locally and verify `docker exec <id> wg show` exits 0 (run manually)
+- [x] 5.4 Run `docker build -t az-demand-vpn-wg infra/container/` — verify build succeeds
+- [x] 5.5 Run container locally and verify `docker exec <id> wg show` exits 0
 
 ## 6. Container image — GHCR publish
 
