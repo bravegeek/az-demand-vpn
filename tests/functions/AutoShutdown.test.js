@@ -1,19 +1,20 @@
 'use strict';
 
-jest.mock('../src/functions/shared/azureClient', () => ({
+jest.mock('../../src/functions/shared/azureClient', () => ({
   getContainerClient: jest.fn(),
   getSecretClient: jest.fn(),
   RESOURCE_GROUP: 'test-rg',
 }));
 
-const { getContainerClient, getSecretClient } = require('../src/functions/shared/azureClient');
+jest.mock('@azure/functions', () => ({
+  app: { timer: jest.fn() },
+}));
 
-let handler;
-beforeAll(() => {
-  const mockApp = { timer: jest.fn((name, opts) => { handler = opts.handler; }) };
-  jest.mock('@azure/functions', () => ({ app: mockApp }));
-  require('../src/functions/AutoShutdown/index');
-});
+const { app } = require('@azure/functions');
+const { getContainerClient, getSecretClient } = require('../../src/functions/shared/azureClient');
+require('../../src/functions/AutoShutdown/index');
+
+const handler = app.timer.mock.calls[0][1].handler;
 
 const context = { error: jest.fn(), warn: jest.fn(), log: jest.fn() };
 

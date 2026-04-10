@@ -78,3 +78,10 @@ old/
 # local rag
 lancedb/
 models/
+
+# Node.js
+node_modules/
+package-lock.json
+
+# Test coverage
+coverage/

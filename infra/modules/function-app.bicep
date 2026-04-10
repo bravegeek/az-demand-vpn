@@ -28,6 +28,15 @@ param keyVaultId string
 @description('Application Insights ID')
 param appInsightsId string
 
+@description('VPN subnet resource ID — passed to VPN containers for VNet integration')
+param vpnSubnetId string
+
+@description('Container image reference for WireGuard VPN containers')
+param vpnContainerImage string
+
+@description('Minutes of inactivity before AutoShutdown reaps a VPN container')
+param idleTimeoutMinutes int = 30
+
 var storageAccountName = last(split(storageAccountId, '/'))
 
 // Flex Consumption App Service Plan — supports VNet integration at Consumption pricing
@@ -77,6 +86,26 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         {
           name: 'StorageAccountName'
           value: storageAccountName
+        }
+        {
+          name: 'AZURE_SUBSCRIPTION_ID'
+          value: subscription().subscriptionId
+        }
+        {
+          name: 'AZURE_RESOURCE_GROUP'
+          value: resourceGroup().name
+        }
+        {
+          name: 'VPN_SUBNET_ID'
+          value: vpnSubnetId
+        }
+        {
+          name: 'VPN_CONTAINER_IMAGE'
+          value: vpnContainerImage
+        }
+        {
+          name: 'VPN_IDLE_TIMEOUT_MINUTES'
+          value: string(idleTimeoutMinutes)
         }
       ]
       ftpsState: 'Disabled'

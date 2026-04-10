@@ -1,21 +1,20 @@
 'use strict';
 
-jest.mock('../src/functions/shared/azureClient', () => ({
+jest.mock('../../src/functions/shared/azureClient', () => ({
   getContainerClient: jest.fn(),
   getSecretClient: jest.fn(),
   RESOURCE_GROUP: 'test-rg',
 }));
 
-const { getContainerClient, getSecretClient } = require('../src/functions/shared/azureClient');
+jest.mock('@azure/functions', () => ({
+  app: { http: jest.fn() },
+}));
 
-// Import triggers handler registration — we test the handler directly via mocks
-// rather than invoking via the Functions host.
-let handler;
-beforeAll(() => {
-  const mockApp = { http: jest.fn((name, opts) => { handler = opts.handler; }) };
-  jest.mock('@azure/functions', () => ({ app: mockApp }));
-  require('../src/functions/StartVPN/index');
-});
+const { app } = require('@azure/functions');
+const { getContainerClient, getSecretClient } = require('../../src/functions/shared/azureClient');
+require('../../src/functions/StartVPN/index');
+
+const handler = app.http.mock.calls[0][1].handler;
 
 const makeRequest = (body) => ({
   json: () => Promise.resolve(body),
@@ -36,10 +35,10 @@ describe('StartVPN', () => {
     };
     getContainerClient.mockReturnValue({ containerGroups });
 
-    const secretPoller = { pollUntilDone: jest.fn().mockResolvedValue({}) };
     const secretClient = {
       getSecret: jest.fn().mockRejectedValue({ statusCode: 404 }),
       setSecret: jest.fn().mockResolvedValue({}),
+      beginDeleteSecret: jest.fn().mockResolvedValue({ pollUntilDone: jest.fn().mockResolvedValue({}) }),
     };
     getSecretClient.mockReturnValue(secretClient);
 
@@ -87,6 +86,7 @@ describe('StartVPN', () => {
     getSecretClient.mockReturnValue({
       getSecret: jest.fn().mockRejectedValue({ statusCode: 404 }),
       setSecret: jest.fn().mockResolvedValue({}),
+      beginDeleteSecret: jest.fn().mockResolvedValue({ pollUntilDone: jest.fn().mockResolvedValue({}) }),
     });
 
     const response = await handler(makeRequest({ sessionId: 'fail-session' }), context);

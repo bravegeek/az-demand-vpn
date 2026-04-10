@@ -1,19 +1,20 @@
 'use strict';
 
-jest.mock('../src/functions/shared/azureClient', () => ({
+jest.mock('../../src/functions/shared/azureClient', () => ({
   getContainerClient: jest.fn(),
   getSecretClient: jest.fn(),
   RESOURCE_GROUP: 'test-rg',
 }));
 
-const { getContainerClient, getSecretClient } = require('../src/functions/shared/azureClient');
+jest.mock('@azure/functions', () => ({
+  app: { http: jest.fn() },
+}));
 
-let handler;
-beforeAll(() => {
-  const mockApp = { http: jest.fn((name, opts) => { handler = opts.handler; }) };
-  jest.mock('@azure/functions', () => ({ app: mockApp }));
-  require('../src/functions/StopVPN/index');
-});
+const { app } = require('@azure/functions');
+const { getContainerClient, getSecretClient } = require('../../src/functions/shared/azureClient');
+require('../../src/functions/StopVPN/index');
+
+const handler = app.http.mock.calls[0][1].handler;
 
 const makeRequest = (body) => ({
   json: () => Promise.resolve(body),

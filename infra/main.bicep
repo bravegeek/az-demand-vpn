@@ -48,6 +48,9 @@ param functionConfig object = {
   version: '20'
 }
 
+@description('Container image reference for WireGuard VPN containers (e.g. ghcr.io/<org>/az-demand-vpn-wg:latest)')
+param vpnContainerImage string = 'ghcr.io/<your-github-org>/az-demand-vpn-wg:latest'
+
 @description('Network configuration')
 param networkConfig object = {
   vnetAddressPrefix: '10.0.0.0/16'
@@ -151,6 +154,9 @@ module functionApp 'modules/function-app.bicep' = {
     storageAccountId: storage.outputs.storageAccountId
     keyVaultId: keyVault.outputs.keyVaultId
     appInsightsId: appInsights.outputs.appInsightsId
+    vpnSubnetId: network.outputs.vpnSubnetId
+    vpnContainerImage: vpnContainerImage
+    idleTimeoutMinutes: vpnConfig.idleTimeoutMinutes
     tags: tags
   }
 }

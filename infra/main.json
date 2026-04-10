@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.42.1.51946",
-      "templateHash": "18172679263909072756"
+      "templateHash": "1794800818639911187"
     }
   },
   "parameters": {
@@ -92,6 +92,13 @@
       },
       "metadata": {
         "description": "Function App configuration"
+      }
+    },
+    "vpnContainerImage": {
+      "type": "string",
+      "defaultValue": "ghcr.io/<your-github-org>/az-demand-vpn-wg:latest",
+      "metadata": {
+        "description": "Container image reference for WireGuard VPN containers (e.g. ghcr.io/<org>/az-demand-vpn-wg:latest)"
       }
     },
     "networkConfig": {
@@ -1456,6 +1463,15 @@
           "appInsightsId": {
             "value": "[reference(resourceId('Microsoft.Resources/deployments', 'appInsights'), '2025-04-01').outputs.appInsightsId.value]"
           },
+          "vpnSubnetId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'network'), '2025-04-01').outputs.vpnSubnetId.value]"
+          },
+          "vpnContainerImage": {
+            "value": "[parameters('vpnContainerImage')]"
+          },
+          "idleTimeoutMinutes": {
+            "value": "[parameters('vpnConfig').idleTimeoutMinutes]"
+          },
           "tags": {
             "value": "[parameters('tags')]"
           }
@@ -1467,7 +1483,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.42.1.51946",
-              "templateHash": "12480528050635959213"
+              "templateHash": "2783142111078550157"
             }
           },
           "parameters": {
@@ -1537,6 +1553,25 @@
               "metadata": {
                 "description": "Application Insights ID"
               }
+            },
+            "vpnSubnetId": {
+              "type": "string",
+              "metadata": {
+                "description": "VPN subnet resource ID — passed to VPN containers for VNet integration"
+              }
+            },
+            "vpnContainerImage": {
+              "type": "string",
+              "metadata": {
+                "description": "Container image reference for WireGuard VPN containers"
+              }
+            },
+            "idleTimeoutMinutes": {
+              "type": "int",
+              "defaultValue": 30,
+              "metadata": {
+                "description": "Minutes of inactivity before AutoShutdown reaps a VPN container"
+              }
             }
           },
           "variables": {
@@ -1591,6 +1626,26 @@
                     {
                       "name": "StorageAccountName",
                       "value": "[variables('storageAccountName')]"
+                    },
+                    {
+                      "name": "AZURE_SUBSCRIPTION_ID",
+                      "value": "[subscription().subscriptionId]"
+                    },
+                    {
+                      "name": "AZURE_RESOURCE_GROUP",
+                      "value": "[resourceGroup().name]"
+                    },
+                    {
+                      "name": "VPN_SUBNET_ID",
+                      "value": "[parameters('vpnSubnetId')]"
+                    },
+                    {
+                      "name": "VPN_CONTAINER_IMAGE",
+                      "value": "[parameters('vpnContainerImage')]"
+                    },
+                    {
+                      "name": "VPN_IDLE_TIMEOUT_MINUTES",
+                      "value": "[string(parameters('idleTimeoutMinutes'))]"
                     }
                   ],
                   "ftpsState": "Disabled",

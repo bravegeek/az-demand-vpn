@@ -1,5 +1,6 @@
 'use strict';
 
+const { generateKeyPairSync, createPublicKey } = require('crypto');
 const { app } = require('@azure/functions');
 const { getContainerClient, getSecretClient, RESOURCE_GROUP } = require('../shared/azureClient');
 
@@ -9,12 +10,32 @@ const STORAGE_ACCOUNT_NAME = process.env.StorageAccountName;
 const VPN_SUBNET_ID = process.env.VPN_SUBNET_ID;
 const IDLE_TIMEOUT_MINUTES = parseInt(process.env.VPN_IDLE_TIMEOUT_MINUTES || '30', 10);
 
+// ACI container group name rules: lowercase alphanumeric + hyphens, start with letter, 1-63 chars
+const SESSION_ID_RE = /^[a-z][a-z0-9-]{0,61}[a-z0-9]$|^[a-z]$/;
+
+/**
+ * Generates a valid WireGuard key pair using Node.js built-in X25519 (Curve25519).
+ * Returns base64-encoded raw 32-byte keys compatible with wg(8).
+ * @returns {{ privateKey: string, publicKey: string }}
+ */
+const generateWireGuardKeyPair = () => {
+  const { privateKey: privKeyObj } = generateKeyPairSync('x25519');
+  const pubKeyObj = createPublicKey(privKeyObj);
+  // PKCS8 DER: 16-byte header + 32-byte raw key; SPKI DER: 12-byte header + 32-byte raw key
+  const privDer = privKeyObj.export({ type: 'pkcs8', format: 'der' });
+  const pubDer = pubKeyObj.export({ type: 'spki', format: 'der' });
+  return {
+    privateKey: privDer.slice(-32).toString('base64'),
+    publicKey: pubDer.slice(-32).toString('base64'),
+  };
+};
+
 /**
  * Builds the ACI container group spec for a WireGuard VPN session.
  * @param {string} sessionId
  * @param {string} location
  * @param {string} serverPrivateKey
- * @returns {object} ACI ContainerGroup spec
+ * @returns {object}
  */
 const buildContainerGroupSpec = (sessionId, location, serverPrivateKey) => ({
   location,
@@ -26,10 +47,7 @@ const buildContainerGroupSpec = (sessionId, location, serverPrivateKey) => ({
         properties: {
           image: CONTAINER_IMAGE,
           resources: { requests: { cpu: 1, memoryInGB: 2 } },
-          ports: [
-            { port: WIREGUARD_PORT, protocol: 'UDP' },
-            { port: 443, protocol: 'TCP' },
-          ],
+          ports: [{ port: WIREGUARD_PORT, protocol: 'UDP' }],
           environmentVariables: [
             { name: 'WG_SERVER_PRIVATE_KEY', secureValue: serverPrivateKey },
             { name: 'WG_SERVER_PORT', value: String(WIREGUARD_PORT) },
@@ -43,10 +61,7 @@ const buildContainerGroupSpec = (sessionId, location, serverPrivateKey) => ({
     restartPolicy: 'Never',
     ipAddress: {
       type: 'Public',
-      ports: [
-        { protocol: 'UDP', port: WIREGUARD_PORT },
-        { protocol: 'TCP', port: 443 },
-      ],
+      ports: [{ protocol: 'UDP', port: WIREGUARD_PORT }],
       dnsNameLabel: `vpn-${sessionId}`,
     },
     subnetIds: VPN_SUBNET_ID ? [{ id: VPN_SUBNET_ID }] : [],
@@ -65,8 +80,13 @@ app.http('StartVPN', {
     const body = await request.json().catch(() => ({}));
     const { sessionId, location = 'eastus2' } = body;
 
-    if (!sessionId) {
-      return { status: 400, body: JSON.stringify({ error: 'sessionId is required' }) };
+    if (!sessionId || !SESSION_ID_RE.test(sessionId)) {
+      return {
+        status: 400,
+        body: JSON.stringify({
+          error: 'sessionId must be 1-63 lowercase alphanumeric characters and hyphens, starting with a letter',
+        }),
+      };
     }
 
     const containerClient = getContainerClient();
@@ -74,7 +94,7 @@ app.http('StartVPN', {
     const containerGroupName = `vpn-${sessionId}`;
 
     try {
-      // Check if a container group already exists for this session
+      // Return existing session without creating a new container (idempotent)
       let existing = null;
       try {
         existing = await containerClient.containerGroups.get(RESOURCE_GROUP, containerGroupName);
@@ -84,43 +104,38 @@ app.http('StartVPN', {
 
       if (existing) {
         const ip = existing.properties?.ipAddress?.ip;
-        const secretName = `wg-peer-config-${sessionId}`;
-        const secret = await secretClient.getSecret(secretName).catch(() => null);
+        const secret = await secretClient.getSecret(`wg-peer-config-${sessionId}`).catch(() => null);
         return {
           status: 200,
-          body: JSON.stringify({
-            status: 'Running',
-            ip,
-            port: WIREGUARD_PORT,
-            clientConfig: secret?.value || null,
-          }),
+          jsonBody: { status: 'Running', ip, port: WIREGUARD_PORT, clientConfig: secret?.value || null },
         };
       }
 
-      // Retrieve server private key from Key Vault (pre-generated and stored during provisioning)
-      const serverKeySecret = await secretClient.getSecret(`wg-server-key-${sessionId}`).catch(() => null);
-      const serverPrivateKey = serverKeySecret?.value || generateWireGuardKey();
+      // Generate a fresh Curve25519 key pair for this session's server
+      const { privateKey: serverPrivateKey, publicKey: serverPublicKey } = generateWireGuardKeyPair();
 
-      // Store key if newly generated
-      if (!serverKeySecret) {
-        await secretClient.setSecret(`wg-server-key-${sessionId}`, serverPrivateKey, {
-          contentType: 'text/plain',
-        });
+      await secretClient.setSecret(`wg-server-key-${sessionId}`, serverPrivateKey, {
+        contentType: 'text/plain',
+      });
+
+      let result;
+      try {
+        const poller = await containerClient.containerGroups.beginCreateOrUpdate(
+          RESOURCE_GROUP,
+          containerGroupName,
+          buildContainerGroupSpec(sessionId, location, serverPrivateKey)
+        );
+        result = await poller.pollUntilDone();
+      } catch (err) {
+        // Clean up orphan server key if ACI creation fails
+        await secretClient.beginDeleteSecret(`wg-server-key-${sessionId}`).catch(() => {});
+        throw err;
       }
-
-      // Create the ACI container group
-      const spec = buildContainerGroupSpec(sessionId, location, serverPrivateKey);
-      const poller = await containerClient.containerGroups.beginCreateOrUpdate(
-        RESOURCE_GROUP,
-        containerGroupName,
-        spec
-      );
-      const result = await poller.pollUntilDone();
 
       const ip = result.properties?.ipAddress?.ip;
 
-      // Generate and store peer config
-      const serverPublicKey = derivePublicKey(serverPrivateKey); // # Reason: placeholder — real impl uses wg pubkey via child_process or pre-computed
+      // TODO (peer-address-allocation): peerAddress is hardcoded — breaks multi-user.
+      // Needs a per-session allocation scheme tracked in Storage Table.
       const peerAddress = '10.8.0.2/32';
       const clientConfig = [
         '[Interface]',
@@ -138,26 +153,10 @@ app.http('StartVPN', {
         contentType: 'text/plain',
       });
 
-      return {
-        status: 200,
-        jsonBody: { status: 'Running', ip, port: WIREGUARD_PORT, clientConfig },
-      };
+      return { status: 200, jsonBody: { status: 'Running', ip, port: WIREGUARD_PORT, clientConfig } };
     } catch (err) {
       context.error('StartVPN failed:', err);
-      return {
-        status: 503,
-        body: JSON.stringify({ error: 'Failed to start VPN', details: err.message }),
-      };
+      return { status: 503, body: JSON.stringify({ error: 'Failed to start VPN', details: err.message }) };
     }
   },
 });
-
-// Placeholder — production implementation should derive the public key using
-// the wg CLI (child_process.execSync) or accept it as a pre-computed input.
-const derivePublicKey = (privateKey) => `pubkey-for-${privateKey.slice(0, 8)}`;
-
-// Placeholder — production implementation should call `wg genkey` via child_process.
-const generateWireGuardKey = () => Buffer.from(crypto.randomBytes(32)).toString('base64');
-
-// eslint-disable-next-line no-undef
-const crypto = require('crypto');

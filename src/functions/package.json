@@ -2,19 +2,18 @@
   "name": "az-demand-vpn-functions",
   "version": "1.0.0",
   "description": "Azure Functions for on-demand WireGuard VPN lifecycle management",
-  "main": "src/index.js",
   "scripts": {
     "start": "func start",
-    "test": "jest --coverage",
-    "test:watch": "jest --watch"
+    "test": "NODE_OPTIONS='--localstorage-file=/tmp/jest-localstorage' jest --coverage --runInBand",
+    "test:watch": "NODE_OPTIONS='--localstorage-file=/tmp/jest-localstorage' jest --watch --runInBand"
   },
   "dependencies": {
     "@azure/arm-containerinstance": "^9.0.0",
+    "@azure/functions": "^4.0.0",
     "@azure/identity": "^4.0.0",
     "@azure/keyvault-secrets": "^4.8.0"
   },
   "devDependencies": {
-    "@azure/functions": "^4.0.0",
     "jest": "^29.0.0"
   },
   "engines": {
