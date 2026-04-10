@@ -69,7 +69,7 @@
 - [x] 9.2 Write Jest tests for `StopVPN`: successful delete, not-found → 404
 - [x] 9.3 Write Jest tests for `CheckVPNStatus`: running, provisioning, not-found states
 - [x] 9.4 Write Jest tests for `AutoShutdown`: idle container reaped, active container spared, partial failure continues batch
-- [ ] 9.5 Run `npm test` — all tests pass (run manually from `src/functions/`: `npm install && npm test`)
+- [x] 9.5 Run `npm test` — all tests pass (run manually from `src/functions/`: `npm install && npm test`)
 
 ## 10. End-to-end validation
 
