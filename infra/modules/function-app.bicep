@@ -37,7 +37,19 @@ param vpnContainerImage string
 @description('Minutes of inactivity before AutoShutdown reaps a VPN container')
 param idleTimeoutMinutes int = 30
 
-var storageAccountName = last(split(storageAccountId, '/'))
+@description('WireGuard tunnel subnet in CIDR notation (e.g. 10.8.0.0/24)')
+param tunnelSubnet string = '10.8.0.0/24'
+
+@description('DNS server for VPN clients')
+param dnsServer string = '1.1.1.1'
+
+@description('Resource ID of the UserAssigned managed identity for VPN containers')
+param containerIdentityId string
+
+@description('Storage account name (passed explicitly to avoid runtime split on resource ID)')
+param storageAccountName string
+
+var storageTableEndpoint = 'https://${storageAccountName}.table.core.windows.net'
 
 // Flex Consumption App Service Plan — supports VNet integration at Consumption pricing
 resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
@@ -106,6 +118,22 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         {
           name: 'VPN_IDLE_TIMEOUT_MINUTES'
           value: string(idleTimeoutMinutes)
+        }
+        {
+          name: 'VPN_TUNNEL_SUBNET'
+          value: tunnelSubnet
+        }
+        {
+          name: 'VPN_DNS_SERVER'
+          value: dnsServer
+        }
+        {
+          name: 'STORAGE_TABLE_ENDPOINT'
+          value: storageTableEndpoint
+        }
+        {
+          name: 'VPN_CONTAINER_IDENTITY_ID'
+          value: containerIdentityId
         }
       ]
       ftpsState: 'Disabled'

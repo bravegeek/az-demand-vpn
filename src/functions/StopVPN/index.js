@@ -1,10 +1,10 @@
 'use strict';
 
 const { app } = require('@azure/functions');
-const { getContainerClient, getSecretClient, RESOURCE_GROUP } = require('../shared/azureClient');
+const { getContainerClient, getSecretClient, getTableClient, RESOURCE_GROUP } = require('../shared/azureClient');
 
 /**
- * StopVPN — deletes the ACI container group and removes peer config from Key Vault.
+ * StopVPN — deletes the ACI container group and removes session state.
  * DELETE /api/StopVPN
  * Body: { sessionId: string }
  */
@@ -21,9 +21,20 @@ app.http('StopVPN', {
 
     const containerClient = getContainerClient();
     const secretClient = getSecretClient();
+    const tableClient = getTableClient();
     const containerGroupName = `vpn-${sessionId}`;
 
     try {
+      // Read sessions row to get peerAddress before deletion
+      let peerAddress = null;
+      try {
+        const sessionRow = await tableClient.getEntity('sessions', sessionId);
+        peerAddress = sessionRow.peerAddress;
+      } catch (err) {
+        if (err.statusCode !== 404) throw err;
+        // No table row — legacy session; continue without address cleanup
+      }
+
       // Verify the container group exists
       try {
         await containerClient.containerGroups.get(RESOURCE_GROUP, containerGroupName);
@@ -38,15 +49,28 @@ app.http('StopVPN', {
       const poller = await containerClient.containerGroups.beginDelete(RESOURCE_GROUP, containerGroupName);
       await poller.pollUntilDone();
 
-      // Clean up Key Vault secrets (best-effort — don't fail stop if secret removal fails)
-      for (const secretName of [`wg-peer-config-${sessionId}`, `wg-server-key-${sessionId}`]) {
-        try {
-          const poller = await secretClient.beginDeleteSecret(secretName);
-          await poller.pollUntilDone();
-        } catch (err) {
-          context.warn(`Could not delete secret ${secretName}:`, err.message);
-        }
+      // Clean up Key Vault secrets and table rows (best-effort — don't fail stop if cleanup fails)
+      const cleanupTasks = [
+        secretClient.beginDeleteSecret(`wg-peer-config-${sessionId}`).catch((err) => {
+          context.warn(`Could not delete secret wg-peer-config-${sessionId}:`, err.message);
+        }),
+        secretClient.beginDeleteSecret(`wg-server-key-${sessionId}`).catch((err) => {
+          context.warn(`Could not delete secret wg-server-key-${sessionId}:`, err.message);
+        }),
+        tableClient.deleteEntity('sessions', sessionId).catch((err) => {
+          context.warn(`Could not delete sessions row ${sessionId}:`, err.message);
+        }),
+      ];
+
+      if (peerAddress) {
+        cleanupTasks.push(
+          tableClient.deleteEntity('addresses', peerAddress).catch((err) => {
+            context.warn(`Could not delete addresses row ${peerAddress}:`, err.message);
+          })
+        );
       }
+
+      await Promise.allSettled(cleanupTasks);
 
       return { status: 200, jsonBody: { status: 'Stopped', sessionId } };
     } catch (err) {

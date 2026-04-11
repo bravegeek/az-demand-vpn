@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.42.1.51946",
-      "templateHash": "15784224419044134980"
+      "templateHash": "3913460934687270624"
     }
   },
   "parameters": {
@@ -53,7 +53,9 @@
       "defaultValue": {
         "wireguardPort": 51820,
         "maxConnections": 100,
-        "idleTimeoutMinutes": 30
+        "idleTimeoutMinutes": 30,
+        "tunnelSubnet": "10.8.0.0/24",
+        "dnsServer": "1.1.1.1"
       },
       "metadata": {
         "description": "VPN configuration parameters"
@@ -137,6 +139,13 @@
   },
   "resources": [
     {
+      "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+      "apiVersion": "2023-01-31",
+      "name": "[format('vpn-container-identity-{0}', variables('uniqueSuffix'))]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]"
+    },
+    {
       "type": "Microsoft.Authorization/roleAssignments",
       "apiVersion": "2022-04-01",
       "name": "[guid(variables('resourceNames').storage, variables('resourceNames').functionApp, variables('storageBlobDataOwnerRoleId'))]",
@@ -173,6 +182,19 @@
       },
       "dependsOn": [
         "[resourceId('Microsoft.Resources/deployments', 'functionApp')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "name": "[guid(variables('resourceNames').storage, format('vpn-container-identity-{0}', variables('uniqueSuffix')), variables('storageTableDataContributorRoleId'))]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('storageTableDataContributorRoleId'))]",
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('vpn-container-identity-{0}', variables('uniqueSuffix'))), '2023-01-31').principalId]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('vpn-container-identity-{0}', variables('uniqueSuffix')))]"
       ]
     },
     {
@@ -1478,6 +1500,18 @@
           "idleTimeoutMinutes": {
             "value": "[parameters('vpnConfig').idleTimeoutMinutes]"
           },
+          "tunnelSubnet": {
+            "value": "[parameters('vpnConfig').tunnelSubnet]"
+          },
+          "dnsServer": {
+            "value": "[parameters('vpnConfig').dnsServer]"
+          },
+          "containerIdentityId": {
+            "value": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('vpn-container-identity-{0}', variables('uniqueSuffix')))]"
+          },
+          "storageAccountName": {
+            "value": "[variables('resourceNames').storage]"
+          },
           "tags": {
             "value": "[parameters('tags')]"
           }
@@ -1489,7 +1523,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.42.1.51946",
-              "templateHash": "2783142111078550157"
+              "templateHash": "14351436973164553340"
             }
           },
           "parameters": {
@@ -1578,10 +1612,36 @@
               "metadata": {
                 "description": "Minutes of inactivity before AutoShutdown reaps a VPN container"
               }
+            },
+            "tunnelSubnet": {
+              "type": "string",
+              "defaultValue": "10.8.0.0/24",
+              "metadata": {
+                "description": "WireGuard tunnel subnet in CIDR notation (e.g. 10.8.0.0/24)"
+              }
+            },
+            "dnsServer": {
+              "type": "string",
+              "defaultValue": "1.1.1.1",
+              "metadata": {
+                "description": "DNS server for VPN clients"
+              }
+            },
+            "containerIdentityId": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource ID of the UserAssigned managed identity for VPN containers"
+              }
+            },
+            "storageAccountName": {
+              "type": "string",
+              "metadata": {
+                "description": "Storage account name (passed explicitly to avoid runtime split on resource ID)"
+              }
             }
           },
           "variables": {
-            "storageAccountName": "[last(split(parameters('storageAccountId'), '/'))]"
+            "storageTableEndpoint": "[format('https://{0}.table.core.windows.net', parameters('storageAccountName'))]"
           },
           "resources": [
             {
@@ -1615,7 +1675,7 @@
                   "appSettings": [
                     {
                       "name": "AzureWebJobsStorage__accountName",
-                      "value": "[variables('storageAccountName')]"
+                      "value": "[parameters('storageAccountName')]"
                     },
                     {
                       "name": "AzureWebJobsStorage__credential",
@@ -1631,7 +1691,7 @@
                     },
                     {
                       "name": "StorageAccountName",
-                      "value": "[variables('storageAccountName')]"
+                      "value": "[parameters('storageAccountName')]"
                     },
                     {
                       "name": "AZURE_SUBSCRIPTION_ID",
@@ -1652,6 +1712,22 @@
                     {
                       "name": "VPN_IDLE_TIMEOUT_MINUTES",
                       "value": "[string(parameters('idleTimeoutMinutes'))]"
+                    },
+                    {
+                      "name": "VPN_TUNNEL_SUBNET",
+                      "value": "[parameters('tunnelSubnet')]"
+                    },
+                    {
+                      "name": "VPN_DNS_SERVER",
+                      "value": "[parameters('dnsServer')]"
+                    },
+                    {
+                      "name": "STORAGE_TABLE_ENDPOINT",
+                      "value": "[variables('storageTableEndpoint')]"
+                    },
+                    {
+                      "name": "VPN_CONTAINER_IDENTITY_ID",
+                      "value": "[parameters('containerIdentityId')]"
                     }
                   ],
                   "ftpsState": "Disabled",
@@ -1668,7 +1744,7 @@
                   "deployment": {
                     "storage": {
                       "type": "blobContainer",
-                      "value": "[format('https://{0}.blob.core.windows.net/azure-webjobs-hosts', variables('storageAccountName'))]",
+                      "value": "[format('https://{0}.blob.core.windows.net/azure-webjobs-hosts', parameters('storageAccountName'))]",
                       "authentication": {
                         "type": "SystemAssignedIdentity"
                       }
@@ -1718,6 +1794,7 @@
       },
       "dependsOn": [
         "[resourceId('Microsoft.Resources/deployments', 'appInsights')]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('vpn-container-identity-{0}', variables('uniqueSuffix')))]",
         "[resourceId('Microsoft.Resources/deployments', 'keyVault')]",
         "[resourceId('Microsoft.Resources/deployments', 'network')]",
         "[resourceId('Microsoft.Resources/deployments', 'storage')]"

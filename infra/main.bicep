@@ -23,6 +23,8 @@ param vpnConfig object = {
   wireguardPort: 51820
   maxConnections: 100
   idleTimeoutMinutes: 30
+  tunnelSubnet: '10.8.0.0/24'
+  dnsServer: '1.1.1.1'
 }
 
 @description('Storage account configuration')
@@ -160,8 +162,19 @@ module functionApp 'modules/function-app.bicep' = {
     vpnSubnetId: network.outputs.vpnSubnetId
     vpnContainerImage: vpnContainerImage
     idleTimeoutMinutes: vpnConfig.idleTimeoutMinutes
+    tunnelSubnet: vpnConfig.tunnelSubnet
+    dnsServer: vpnConfig.dnsServer
+    containerIdentityId: containerIdentity.id
+    storageAccountName: resourceNames.storage
     tags: tags
   }
+}
+
+// UserAssigned managed identity for VPN containers (heartbeat writes to Storage Table)
+resource containerIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: 'vpn-container-identity-${uniqueSuffix}'
+  location: location
+  tags: tags
 }
 
 // RBAC role assignments: Function App managed identity → Storage Account
@@ -196,6 +209,17 @@ resource funcStorageTableRole 'Microsoft.Authorization/roleAssignments@2022-04-0
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageTableDataContributorRoleId)
     principalId: functionApp.outputs.managedIdentityPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// RBAC: VPN container identity → Storage Table Data Contributor (for heartbeat writes)
+resource containerStorageTableRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(resourceNames.storage, containerIdentity.name, storageTableDataContributorRoleId)
+  scope: resourceGroup()
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageTableDataContributorRoleId)
+    principalId: containerIdentity.properties.principalId
     principalType: 'ServicePrincipal'
   }
 }
