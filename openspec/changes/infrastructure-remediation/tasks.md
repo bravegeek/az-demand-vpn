@@ -44,7 +44,7 @@
 
 ## 6. Container image — GHCR publish
 
-- [ ] 6.1 Confirm GitHub org/repo name and update image reference in `vpn-container.bicep` (replace `<your-github-org>` placeholder) and `StartVPN/index.js`
+- [x] 6.1 Confirm GitHub org/repo name and update image reference in `vpn-container.bicep` (replace `<your-github-org>` placeholder) and `StartVPN/index.js`
 - [x] 6.2 Create `.github/workflows/build-push-image.yml` — triggers on push to `main`, builds and pushes `ghcr.io/<org>/az-demand-vpn-wg:latest`
 - [ ] 6.3 Set GHCR package visibility to public (set in GitHub repo → Packages settings after first push)
 - [ ] 6.4 Verify ACI can pull the image without credentials (create a test container group manually)

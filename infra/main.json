@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.42.1.51946",
-      "templateHash": "1794800818639911187"
+      "templateHash": "15784224419044134980"
     }
   },
   "parameters": {
@@ -94,11 +94,17 @@
         "description": "Function App configuration"
       }
     },
+    "githubOrg": {
+      "type": "string",
+      "metadata": {
+        "description": "GitHub organization or username that owns the GHCR container image"
+      }
+    },
     "vpnContainerImage": {
       "type": "string",
-      "defaultValue": "ghcr.io/<your-github-org>/az-demand-vpn-wg:latest",
+      "defaultValue": "[format('ghcr.io/{0}/az-demand-vpn-wg:latest', parameters('githubOrg'))]",
       "metadata": {
-        "description": "Container image reference for WireGuard VPN containers (e.g. ghcr.io/<org>/az-demand-vpn-wg:latest)"
+        "description": "Container image reference for WireGuard VPN containers — defaults to GHCR image for githubOrg"
       }
     },
     "networkConfig": {

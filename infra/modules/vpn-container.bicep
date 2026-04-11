@@ -29,7 +29,7 @@ param wireguardPort int = 51820
 param maxConnections int = 100
 
 @description('Container image — public GHCR image, no credentials required')
-param containerImage string = 'ghcr.io/<your-github-org>/az-demand-vpn-wg:latest'
+param containerImage string
 
 @description('Container CPU cores')
 param cpuCores int = 1

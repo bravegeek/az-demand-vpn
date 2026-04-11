@@ -5,6 +5,9 @@
     "projectName": {
       "value": "demandvpn"
     },
+    "githubOrg": {
+      "value": "bravegeek"
+    },
     "environment": {
       "value": "dev"
     },

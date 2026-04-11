@@ -5,10 +5,16 @@ const { app } = require('@azure/functions');
 const { getContainerClient, getSecretClient, RESOURCE_GROUP } = require('../shared/azureClient');
 
 const WIREGUARD_PORT = parseInt(process.env.VPN_WIREGUARD_PORT || '51820', 10);
-const CONTAINER_IMAGE = process.env.VPN_CONTAINER_IMAGE || 'ghcr.io/<your-github-org>/az-demand-vpn-wg:latest';
+const IDLE_TIMEOUT_MINUTES = parseInt(process.env.VPN_IDLE_TIMEOUT_MINUTES || '30', 10);
+
+// Fail fast — these are required and set by Bicep; no sensible fallback exists
+const REQUIRED = ['VPN_CONTAINER_IMAGE', 'StorageAccountName', 'VPN_SUBNET_ID'];
+const missing = REQUIRED.filter((k) => !process.env[k]);
+if (missing.length > 0) throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+
+const CONTAINER_IMAGE = process.env.VPN_CONTAINER_IMAGE;
 const STORAGE_ACCOUNT_NAME = process.env.StorageAccountName;
 const VPN_SUBNET_ID = process.env.VPN_SUBNET_ID;
-const IDLE_TIMEOUT_MINUTES = parseInt(process.env.VPN_IDLE_TIMEOUT_MINUTES || '30', 10);
 
 // ACI container group name rules: lowercase alphanumeric + hyphens, start with letter, 1-63 chars
 const SESSION_ID_RE = /^[a-z][a-z0-9-]{0,61}[a-z0-9]$|^[a-z]$/;

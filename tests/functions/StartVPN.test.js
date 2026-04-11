@@ -10,6 +10,11 @@ jest.mock('@azure/functions', () => ({
   app: { http: jest.fn() },
 }));
 
+// Set required env vars before module load (fail-fast check runs at require time)
+process.env.VPN_CONTAINER_IMAGE = 'ghcr.io/test/az-demand-vpn-wg:latest';
+process.env.StorageAccountName = 'teststorage';
+process.env.VPN_SUBNET_ID = '/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Network/virtualNetworks/test-vnet/subnets/vpn';
+
 const { app } = require('@azure/functions');
 const { getContainerClient, getSecretClient } = require('../../src/functions/shared/azureClient');
 require('../../src/functions/StartVPN/index');

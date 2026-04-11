@@ -48,8 +48,11 @@ param functionConfig object = {
   version: '20'
 }
 
-@description('Container image reference for WireGuard VPN containers (e.g. ghcr.io/<org>/az-demand-vpn-wg:latest)')
-param vpnContainerImage string = 'ghcr.io/<your-github-org>/az-demand-vpn-wg:latest'
+@description('GitHub organization or username that owns the GHCR container image')
+param githubOrg string
+
+@description('Container image reference for WireGuard VPN containers — defaults to GHCR image for githubOrg')
+param vpnContainerImage string = 'ghcr.io/${githubOrg}/az-demand-vpn-wg:latest'
 
 @description('Network configuration')
 param networkConfig object = {
