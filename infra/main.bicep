@@ -40,9 +40,12 @@ param keyVaultConfig object = {
   sku: 'standard'
   enableSoftDelete: true
   softDeleteRetentionInDays: 90
-  enablePurgeProtection: true
   enableRbacAuthorization: true
 }
+
+// Purge protection prevents vault deletion for 90 days — desirable in prod, painful in dev/test
+// where redeployment with the same project name would fail on a soft-deleted vault.
+var enableKvPurgeProtection = environment == 'prod'
 
 @description('Function App configuration')
 param functionConfig object = {
@@ -114,6 +117,11 @@ module network 'modules/network.bicep' = {
 
 // TODO: Add ACR as optional private registry for private image hosting — see design.md Decision 1
 
+// Private endpoints are used in prod; service endpoints (free) are used in dev/test.
+// # Reason: private endpoints cost ~$7.30/month each; service endpoints provide equivalent
+//   network-level restriction at no cost for non-production environments.
+var enablePrivateEndpoints = environment == 'prod'
+
 // Deploy Storage Account
 module storage 'modules/storage.bicep' = {
   name: 'storage'
@@ -125,7 +133,10 @@ module storage 'modules/storage.bicep' = {
     allowBlobPublicAccess: storageConfig.allowBlobPublicAccess
     allowSharedKeyAccess: storageConfig.allowSharedKeyAccess
     vnetId: network.outputs.vnetId
+    functionsSubnetId: network.outputs.functionsSubnetId
+    vpnSubnetId: network.outputs.vpnSubnetId
     endpointsSubnetId: network.outputs.endpointsSubnetId
+    enablePrivateEndpoints: enablePrivateEndpoints
     tags: tags
   }
 }
@@ -139,10 +150,13 @@ module keyVault 'modules/key-vault.bicep' = {
     sku: keyVaultConfig.sku
     enableSoftDelete: keyVaultConfig.enableSoftDelete
     softDeleteRetentionInDays: keyVaultConfig.softDeleteRetentionInDays
-    enablePurgeProtection: keyVaultConfig.enablePurgeProtection
+    enablePurgeProtection: enableKvPurgeProtection
     enableRbacAuthorization: keyVaultConfig.enableRbacAuthorization
     vnetId: network.outputs.vnetId
+    functionsSubnetId: network.outputs.functionsSubnetId
+    vpnSubnetId: network.outputs.vpnSubnetId
     endpointsSubnetId: network.outputs.endpointsSubnetId
+    enablePrivateEndpoints: enablePrivateEndpoints
     tags: tags
   }
 }
@@ -156,8 +170,7 @@ module functionApp 'modules/function-app.bicep' = {
     runtime: functionConfig.runtime
     version: functionConfig.version
     subnetId: network.outputs.functionsSubnetId
-    storageAccountId: storage.outputs.storageAccountId
-    keyVaultId: keyVault.outputs.keyVaultId
+    keyVaultUri: keyVault.outputs.keyVaultUri
     appInsightsId: appInsights.outputs.appInsightsId
     vpnSubnetId: network.outputs.vpnSubnetId
     vpnContainerImage: vpnContainerImage
@@ -208,6 +221,19 @@ resource funcStorageTableRole 'Microsoft.Authorization/roleAssignments@2022-04-0
   scope: resourceGroup()
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageTableDataContributorRoleId)
+    principalId: functionApp.outputs.managedIdentityPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// RBAC: Function App managed identity → Key Vault Secrets Officer (read/write/delete secrets)
+var keyVaultSecretsOfficerRoleId = 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7'
+
+resource funcKeyVaultRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(resourceNames.keyVault, resourceNames.functionApp, keyVaultSecretsOfficerRoleId)
+  scope: resourceGroup()
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultSecretsOfficerRoleId)
     principalId: functionApp.outputs.managedIdentityPrincipalId
     principalType: 'ServicePrincipal'
   }

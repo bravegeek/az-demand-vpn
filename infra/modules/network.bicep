@@ -43,6 +43,10 @@ resource virtualNetwork 'Microsoft.Network/virtualNetworks@2023-09-01' = {
           networkSecurityGroup: {
             id: vpnNsg.id
           }
+          serviceEndpoints: [
+            { service: 'Microsoft.Storage' }
+            { service: 'Microsoft.KeyVault' }
+          ]
           delegations: [
             {
               name: 'Microsoft.ContainerInstance.containerGroups'
@@ -60,6 +64,10 @@ resource virtualNetwork 'Microsoft.Network/virtualNetworks@2023-09-01' = {
           networkSecurityGroup: {
             id: functionsNsg.id
           }
+          serviceEndpoints: [
+            { service: 'Microsoft.Storage' }
+            { service: 'Microsoft.KeyVault' }
+          ]
           delegations: [
             {
               // Flex Consumption Functions require Microsoft.App/environments delegation
@@ -105,19 +113,6 @@ resource vpnNsg 'Microsoft.Network/networkSecurityGroups@2023-09-01' = {
         }
       }
       {
-        name: 'AllowHTTPS'
-        properties: {
-          priority: 120
-          protocol: 'Tcp'
-          access: 'Allow'
-          direction: 'Inbound'
-          sourceAddressPrefix: '*'
-          sourcePortRange: '*'
-          destinationAddressPrefix: '*'
-          destinationPortRange: '443'
-        }
-      }
-      {
         name: 'DenyAllInbound'
         properties: {
           priority: 4096
@@ -142,29 +137,19 @@ resource functionsNsg 'Microsoft.Network/networkSecurityGroups@2023-09-01' = {
   properties: {
     securityRules: [
       {
+        // # Reason: Flex Consumption uses this subnet for outbound VNet integration only.
+        // Inbound HTTPS is not triggered via the subnet, but the Azure scale controller
+        // and health probes require this rule to be present for platform management traffic.
         name: 'AllowHTTPS'
         properties: {
           priority: 100
           protocol: 'Tcp'
           access: 'Allow'
           direction: 'Inbound'
-          sourceAddressPrefix: '*'
+          sourceAddressPrefix: 'AzureLoadBalancer'
           sourcePortRange: '*'
           destinationAddressPrefix: '*'
           destinationPortRange: '443'
-        }
-      }
-      {
-        name: 'AllowHTTP'
-        properties: {
-          priority: 110
-          protocol: 'Tcp'
-          access: 'Allow'
-          direction: 'Inbound'
-          sourceAddressPrefix: '*'
-          sourcePortRange: '*'
-          destinationAddressPrefix: '*'
-          destinationPortRange: '80'
         }
       }
       {
@@ -186,8 +171,9 @@ resource functionsNsg 'Microsoft.Network/networkSecurityGroups@2023-09-01' = {
 
 output vnetId string = virtualNetwork.id
 output vnetName string = virtualNetwork.name
-output vpnSubnetId string = virtualNetwork.properties.subnets[0].id
-output functionsSubnetId string = virtualNetwork.properties.subnets[1].id
-output endpointsSubnetId string = virtualNetwork.properties.subnets[2].id
+// # Reason: resourceId keyed on subnet name is stable regardless of subnet order in the array
+output vpnSubnetId string = resourceId('Microsoft.Network/virtualNetworks/subnets', virtualNetwork.name, 'snet-vpn')
+output functionsSubnetId string = resourceId('Microsoft.Network/virtualNetworks/subnets', virtualNetwork.name, 'snet-functions')
+output endpointsSubnetId string = resourceId('Microsoft.Network/virtualNetworks/subnets', virtualNetwork.name, 'snet-endpoints')
 output vpnNsgId string = vpnNsg.id
 output functionsNsgId string = functionsNsg.id

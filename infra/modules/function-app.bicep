@@ -19,11 +19,8 @@ param version string = '20'
 @description('Subnet ID for VNet integration')
 param subnetId string
 
-@description('Storage Account ID')
-param storageAccountId string
-
-@description('Key Vault ID')
-param keyVaultId string
+@description('Key Vault URI (e.g. https://kv-name.vault.azure.net/)')
+param keyVaultUri string
 
 @description('Application Insights ID')
 param appInsightsId string
@@ -93,7 +90,7 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         }
         {
           name: 'KeyVaultUri'
-          value: 'https://${last(split(keyVaultId, '/'))}.vault.azure.net/'
+          value: keyVaultUri
         }
         {
           name: 'StorageAccountName'

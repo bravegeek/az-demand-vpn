@@ -26,14 +26,20 @@ param allowSharedKeyAccess bool = false
 @description('Enable hierarchical namespace')
 param enableHierarchicalNamespace bool = false
 
-@description('Virtual Network ID')
+@description('Virtual Network ID — used for private DNS zone link when enablePrivateEndpoints is true')
 param vnetId string
+
+@description('Functions subnet ID — granted service endpoint access to storage')
+param functionsSubnetId string
+
+@description('VPN subnet ID — granted service endpoint access to storage (heartbeat writes)')
+param vpnSubnetId string
 
 @description('Private endpoints subnet ID')
 param endpointsSubnetId string
 
-@description('Enable private endpoints')
-param enablePrivateEndpoints bool = true
+@description('Enable private endpoints (use false for service endpoints, true for production)')
+param enablePrivateEndpoints bool = false
 
 @description('Enable blob encryption')
 param enableBlobEncryption bool = true
@@ -79,11 +85,10 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
     }
     networkAcls: {
       defaultAction: 'Deny'
+      bypass: 'AzureServices'
       virtualNetworkRules: [
-        {
-          id: vnetId
-          action: 'Allow'
-        }
+        { id: functionsSubnetId, action: 'Allow' }
+        { id: vpnSubnetId, action: 'Allow' }
       ]
       ipRules: []
     }
@@ -98,44 +103,7 @@ resource blobServices 'Microsoft.Storage/storageAccounts/blobServices@2023-01-01
   name: 'default'
 }
 
-// Blob containers for VPN configuration
-resource vpnConfigsContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
-  parent: blobServices
-  name: 'vpn-configs'
-  properties: {
-    publicAccess: 'None'
-    metadata: {
-      purpose: 'VPN Configuration Files'
-      type: 'WireGuard-OpenVPN'
-    }
-  }
-}
-
-resource vpnKeysContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
-  parent: blobServices
-  name: 'vpn-keys'
-  properties: {
-    publicAccess: 'None'
-    metadata: {
-      purpose: 'VPN Key Pairs'
-      type: 'Public-Private Keys'
-    }
-  }
-}
-
-resource vpnLogsContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
-  parent: blobServices
-  name: 'vpn-logs'
-  properties: {
-    publicAccess: 'None'
-    metadata: {
-      purpose: 'VPN Connection Logs'
-      type: 'Audit Trail'
-    }
-  }
-}
-
-// Private endpoint for storage account
+// Private endpoint for blob storage
 resource storagePrivateEndpoint 'Microsoft.Network/privateEndpoints@2023-09-01' = if (enablePrivateEndpoints) {
   name: '${name}-pe'
   location: location
@@ -178,7 +146,7 @@ resource storagePrivateDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNet
   }
 }
 
-// DNS A record for private endpoint
+// DNS A record for blob private endpoint
 resource storagePrivateDnsRecord 'Microsoft.Network/privateDnsZones/A@2020-06-01' = if (enablePrivateEndpoints) {
   parent: storagePrivateDnsZone
   name: name
@@ -192,11 +160,63 @@ resource storagePrivateDnsRecord 'Microsoft.Network/privateDnsZones/A@2020-06-01
   }
 }
 
+// Private endpoint for table storage (session state and heartbeat writes)
+resource storageTablePrivateEndpoint 'Microsoft.Network/privateEndpoints@2023-09-01' = if (enablePrivateEndpoints) {
+  name: '${name}-table-pe'
+  location: location
+  tags: tags
+  properties: {
+    subnet: {
+      id: endpointsSubnetId
+    }
+    privateLinkServiceConnections: [
+      {
+        name: '${name}-table-pls'
+        properties: {
+          privateLinkServiceId: storageAccount.id
+          groupIds: [
+            'table'
+          ]
+        }
+      }
+    ]
+  }
+}
+
+resource storageTablePrivateDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = if (enablePrivateEndpoints) {
+  name: 'privatelink.table.core.windows.net'
+  location: 'global'
+  tags: tags
+}
+
+resource storageTablePrivateDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = if (enablePrivateEndpoints) {
+  parent: storageTablePrivateDnsZone
+  name: '${name}-table-link'
+  location: 'global'
+  properties: {
+    virtualNetwork: {
+      id: vnetId
+    }
+    registrationEnabled: false
+  }
+}
+
+resource storageTablePrivateDnsRecord 'Microsoft.Network/privateDnsZones/A@2020-06-01' = if (enablePrivateEndpoints) {
+  parent: storageTablePrivateDnsZone
+  name: name
+  properties: {
+    ttl: 300
+    aRecords: [
+      {
+        ipv4Address: storageTablePrivateEndpoint.properties.customDnsConfigs[0].ipAddresses[0]
+      }
+    ]
+  }
+}
+
 output storageAccountId string = storageAccount.id
 output storageAccountName string = storageAccount.name
 output primaryBlobEndpoint string = storageAccount.properties.primaryEndpoints.blob
 output primaryQueueEndpoint string = storageAccount.properties.primaryEndpoints.queue
 output primaryTableEndpoint string = storageAccount.properties.primaryEndpoints.table
 output primaryFileEndpoint string = storageAccount.properties.primaryEndpoints.file
-output primaryAccessKey string = storageAccount.listKeys().keys[0].value
-output connectionString string = 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=core.windows.net'

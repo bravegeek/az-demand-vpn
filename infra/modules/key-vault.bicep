@@ -25,18 +25,24 @@ param enablePurgeProtection bool = true
 @description('Enable RBAC authorization')
 param enableRbacAuthorization bool = true
 
-@description('Virtual Network ID')
+@description('Virtual Network ID — used for private DNS zone link when enablePrivateEndpoints is true')
 param vnetId string
+
+@description('Functions subnet ID — granted service endpoint access to Key Vault')
+param functionsSubnetId string
+
+@description('VPN subnet ID — granted service endpoint access to Key Vault (not strictly needed today, but forward-compatible)')
+param vpnSubnetId string
 
 @description('Private endpoints subnet ID')
 param endpointsSubnetId string
 
-@description('Enable private endpoints')
-param enablePrivateEndpoints bool = true
+@description('Enable private endpoints (use false for service endpoints, true for production)')
+param enablePrivateEndpoints bool = false
 
-@description('Enable public network access')
-@allowed(['Enabled', 'Disabled'])
-param publicNetworkAccess string = 'Disabled'
+// Service endpoints use the public hostname routed over the Azure backbone.
+// publicNetworkAccess must be Enabled for service endpoints to work; private endpoints can lock it down fully.
+var effectivePublicNetworkAccess = enablePrivateEndpoints ? 'Disabled' : 'Enabled'
 
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   name: name
@@ -52,16 +58,14 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
     softDeleteRetentionInDays: softDeleteRetentionInDays
     enablePurgeProtection: enablePurgeProtection
     enableRbacAuthorization: enableRbacAuthorization
-    publicNetworkAccess: publicNetworkAccess
+    publicNetworkAccess: effectivePublicNetworkAccess
     networkAcls: {
       defaultAction: 'Deny'
       bypass: 'AzureServices'
       ipRules: []
       virtualNetworkRules: [
-        {
-          id: vnetId
-          ignoreMissingVnetServiceEndpoint: false
-        }
+        { id: functionsSubnetId, ignoreMissingVnetServiceEndpoint: false }
+        { id: vpnSubnetId, ignoreMissingVnetServiceEndpoint: false }
       ]
     }
   }
