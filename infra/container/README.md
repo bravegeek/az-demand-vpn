@@ -398,6 +398,6 @@ Report issues via:
 ---
 
 **Version**: 1.0  
-**Last Updated**: June 17, 2025  
+**Last Updated**: September 27, 2026  
 **Compatibility**: Azure Container Instances, Docker 20.10+  
 **WireGuard Version**: Latest stable (via Alpine package)
